@@ -1,0 +1,11 @@
+"Phrases"
+{
+	"SP Time Perm"
+	{
+		"en"			"perrmanent"
+	}
+	"SP Bad Target"
+	{
+		"en"			"Player no long avilable or does not exist."
+	}
+}

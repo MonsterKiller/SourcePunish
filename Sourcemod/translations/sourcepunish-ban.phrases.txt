@@ -1,0 +1,37 @@
+"Phrases"
+{
+	"SP Ban Active"
+	{
+		"en"			"already has an active ban!"
+	}
+	"SP Ban"
+	{
+		"#format"		"{1:s},{2:s}"
+		"en"			"banned \"{1}\" for {2}"
+	}
+	"SP Ban Noname"
+	{
+		"#format"		"{1:s}"
+		"en"			"banned for {1}"
+	}
+	"SP Ban Reason"
+	{
+		"#format"		"{1:s},{2:s},{3:s}"
+		"en"			"banned \"{1}\" for {2} ({3})"
+	}
+	"SP Ban Noname Reason"
+	{
+		"#format"		"{1:s},{2:s}"
+		"en"			"banned for {1} ({2})"
+	}
+	"SP Unban"
+	{
+		"#format"		"{1:s}"
+		"en"			"unbanned \"{1}\""
+	}
+	"SP Unban Reason"
+	{
+		"#format"		"{1:s},{2:s}"
+		"en"			"unbanned \"{1}\" ({2})"
+	}
+}
