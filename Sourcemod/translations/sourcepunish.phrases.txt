@@ -2,7 +2,35 @@
 {
 	"SP Time Perm"
 	{
-		"en"			"perrmanent"
+		"en"			"permanent"
+	}
+	"SP Time Year"
+	{
+		"en"			"years"
+	}
+	"SP Time Month"
+	{
+		"en"			"months"
+	}
+	"SP Time Week"
+	{
+		"en"			"weeks"
+	}
+	"SP Time Day"
+	{
+		"en"			"days"
+	}
+	"SP Time Hour"
+	{
+		"en"			"hours"
+	}
+	"SP Time Min"
+	{
+		"en"			"minutes"
+	}
+	"SP Time Sec"
+	{
+		"en"			"seconds"
 	}
 	"SP Bad Target"
 	{

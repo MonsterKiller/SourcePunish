@@ -39,7 +39,8 @@ public Action:Forward_Ban(userid, starttime, length, authtype, String:reason[])
         if(length > 0)
             Time = (starttime + (length * 60)) -  GetTime();
         //Time = RoundToNearest(Time);
-        SP_TimeToString(Time, TimeString, SP_MAXLEN_TIME);
+        SP_TimeToString(Time, TimeString, sizeof(TimeString));
+        PrintToServer("PLUGIN TIME: %s", TimeString);
         if(StrEqual(reason, ""))
             KickClient(client, "%t", "SP Ban Noname", TimeString);
         else

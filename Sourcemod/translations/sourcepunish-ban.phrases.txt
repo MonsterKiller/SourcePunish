@@ -22,7 +22,7 @@
 	"SP Ban Noname Reason"
 	{
 		"#format"		"{1:s},{2:s}"
-		"en"			"banned for {1} ({2})"
+		"en"			"({2}) banned for {1}"
 	}
 	"SP Unban"
 	{
