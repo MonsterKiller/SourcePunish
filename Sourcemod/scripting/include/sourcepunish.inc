@@ -1,8 +1,3 @@
-#if defined _sourcepunish_included
-  #endinput
-#endif
-#define _sourcepunish_included
-
 #define SP_PLUGIN_VERSION "0.1.0"
 #define SP_PLUGIN_URL "http://sourcepunish.net"
 #define SP_PREFIX "[\x07FF0000SP\x01]"
@@ -14,8 +9,27 @@
 #define SP_MAXLEN_TYPE 20 // The maximum length of a type string
 #define SP_MAXLEN_REASON 70 // The maximum length of a reason string
 #define SP_MAXLEN_NAME 60 // The maximum length of a clients name string
-#define SP_MAXLEN_AUTH 18 // The maximum length of a client auth string
+#define SP_MAXLEN_AUTH 64 // The maximum length of a client auth string
 #define SP_MAXLEN_IP 15 // The maximum length of a client IP string
+
+public SharedPlugin:__pl_sourcepunish = 
+{
+	name = "sourcepunish",
+	file = "sourcepunish.smx",
+#if defined REQUIRE_PLUGIN
+	required = 1,
+#else
+	required = 0,
+#endif
+};
+ 
+public __pl_sourcepunish_SetNTVOptional()
+{
+	MarkNativeAsOptional("SP_RegPunishForward");
+	MarkNativeAsOptional("SP_DeRegPunishForward");
+	MarkNativeAsOptional("SP_TimeToString");
+	MarkNativeAsOptional("SP_DB_AddPunish");
+}
 
 /**
  * Called when a player joins with an active punishment.

@@ -45,10 +45,10 @@ public OnPluginStart()
 
 public OnAllPluginsLoaded()
 {
-    new Handle:loaded = CreateGlobalForward("SP_Loaded", ET_Ignore);
-    Call_StartForward(loaded);
+    new Handle:hLoaded = CreateGlobalForward("SP_Loaded", ET_Ignore);
+    Call_StartForward(hLoaded);
     Call_Finish();
-    CloseHandle(loaded);
+    CloseHandle(hLoaded);
 }
 
 public OnPluginEnd()
@@ -65,25 +65,28 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
     CreateNative("SP_TimeToString", N_SP_TimeToString);
     CreateNative("SP_RegPunishForward", N_SP_RegPunishForward);
     CreateNative("SP_DeRegPunishForward", N_SP_DeRegPunishForward);
-    //CreateNative("SP_DB_AddPunish", N_SP_SQL_AddPunish);
+    CreateNative("SP_DB_AddPunish", N_SP_DB_AddPunish);
+    RegPluginLibrary("sourcepunish");
     return APLRes_Success;
 }
 
 SP_LoadConfig()
 {
-    new String:KVFile[128];
-    BuildPath(Path_SM, KVFile, sizeof(KVFile), "configs/sourcepunish.cfg");
-    if(!FileExists(KVFile))
+    new String:sKVFile[128];
+    BuildPath(Path_SM, sKVFile, sizeof(sKVFile), "configs/sourcepunish.cfg");
+    if(!FileExists(sKVFile))
         SetFailState("SourcePunish - configs/sourcepunish.cfg not found!");
     g_hKV = CreateKeyValues("SourcePunish");
-    FileToKeyValues(g_hKV, KVFile);
+    FileToKeyValues(g_hKV, sKVFile);
 
     if (!KvJumpToKey(g_hKV, "Settings"))
         SetFailState("SourcePunish - sourcepunish.cfg - settings not found!");
 
     g_iServerID = KvGetNum(g_hKV, "ServerID", 0);
     g_bPunishAllServers = KvGetNum(g_hKV, "PunishFromAllServers", 1);
+    if(g_bPunishAllServers != 1) g_bPunishAllServers = 0;
     g_bPunishAllMods = KvGetNum(g_hKV, "PunishFromAllMods", 0);
+    if(g_bPunishAllMods != 0) g_bPunishAllMods = 1;
     KvGetString(g_hKV, "DBPrefix", g_sDBPrefix, sizeof(g_sDBPrefix));
 
     SP_LoadDB();
@@ -107,15 +110,15 @@ public SQLConnect(Handle:owner, Handle:hndl, const String:error[], any:data)
 
 SP_SQLLoadedConf()
 {
-    decl String:sDBPrefixSafe[10], String:query[80], String:serverID[11], String:safeServerID[22];
+    decl String:sDBPrefixSafe[10], String:sQuery[80], String:sServerID[11], String:sSafeServerID[22];
     SQL_EscapeString(g_hSQL, g_sDBPrefix, sDBPrefixSafe, sizeof(sDBPrefixSafe));
     Format(g_sDBPrefix, sizeof(g_sDBPrefix), sDBPrefixSafe);
     
-    IntToString(g_iServerID, serverID, sizeof(serverID));
-    SQL_EscapeString(g_hSQL, serverID, safeServerID, sizeof(safeServerID));
-    g_iServerID = StringToInt(safeServerID);
-    Format(query, sizeof(query), "SELECT Server_Mod FROM %s%s WHERE id = '%s' LIMIT 1", g_sDBPrefix, SP_DB_NAME_SERVER, safeServerID);
-    SQL_TQuery(g_hSQL, Query_LoadConf, query, 0);
+    IntToString(g_iServerID, sServerID, sizeof(sServerID));
+    SQL_EscapeString(g_hSQL, sServerID, sSafeServerID, sizeof(sSafeServerID));
+    g_iServerID = StringToInt(sSafeServerID);
+    Format(sQuery, sizeof(sQuery), "SELECT Server_Mod FROM %s%s WHERE id = '%s' LIMIT 1", g_sDBPrefix, SP_DB_NAME_SERVER, sSafeServerID);
+    SQL_TQuery(g_hSQL, Query_LoadConf, sQuery, 0);
 }
 
 public Query_LoadConf(Handle:owner, Handle:hndl, const String:error[], any:data)
@@ -132,13 +135,13 @@ public Query_LoadConf(Handle:owner, Handle:hndl, const String:error[], any:data)
 public N_SP_TimeToString(Handle:plugin, numparams)
 {
     new iTime = GetNativeCell(1);
-    new maxlen = GetNativeCell(3);
-    decl String:TimeString[maxlen];
-    TimeString[0] = '\0';
+    new iMaxlen = GetNativeCell(3);
+    decl String:sTimeString[iMaxlen];
+    sTimeString[0] = '\0';
     if (iTime == 0)
     {
-        Format(TimeString, maxlen, "%t", "SP Time Perm");
-        SetNativeString(2, TimeString, maxlen);
+        Format(sTimeString, iMaxlen, "%t", "SP Time Perm");
+        SetNativeString(2, sTimeString, iMaxlen);
         return;
     }
     new iYears = iTime / 31556900;
@@ -155,50 +158,49 @@ public N_SP_TimeToString(Handle:plugin, numparams)
     iTime -= iMinutes * 60;
 
     if (iYears > 0) 
-        Format(TimeString, maxlen, "%d %t ", iWeeks, "SP Time Year");
+        Format(sTimeString, iMaxlen, "%d %t ", iWeeks, "SP Time Year");
     if (iMonths > 0) 
-        Format(TimeString, maxlen, "%s%d %t ", TimeString, iMonths, "SP Time Month");
+        Format(sTimeString, iMaxlen, "%s%d %t ", sTimeString, iMonths, "SP Time Month");
     if (iWeeks > 0)
-        Format(TimeString, maxlen, "%s%d %t ", TimeString, iWeeks, "SP Time Week");
+        Format(sTimeString, iMaxlen, "%s%d %t ", sTimeString, iWeeks, "SP Time Week");
     if (iDays > 0)
-        Format(TimeString, maxlen, "%s%d %t ", TimeString, iDays, "SP Time Day");
+        Format(sTimeString, iMaxlen, "%s%d %t ", sTimeString, iDays, "SP Time Day");
     if (iHours > 0)
-        Format(TimeString, maxlen, "%s%d %t ", TimeString, iHours, "SP Time Hour");
+        Format(sTimeString, iMaxlen, "%s%d %t ", sTimeString, iHours, "SP Time Hour");
     if (iMinutes > 0)
-        Format(TimeString, maxlen, "%s%d %t ", TimeString, iMinutes, "SP Time Min");
+        Format(sTimeString, iMaxlen, "%s%d %t ", sTimeString, iMinutes, "SP Time Min");
     if (iTime > 0)
-        Format(TimeString, maxlen, "%s%d %t ", TimeString, iTime, "SP Time Sec");
-    PrintToServer("**** TIME: %s",TimeString);
-    TimeString[strlen(TimeString)-1] = '\0';
-    SetNativeString(2, TimeString, maxlen);
+        Format(sTimeString, iMaxlen, "%s%d %t ", sTimeString, iTime, "SP Time Sec");
+    sTimeString[strlen(sTimeString)-1] = '\0';
+    SetNativeString(2, sTimeString, iMaxlen);
 }
 
 public N_SP_RegPunishForward(Handle:plugin, numParams) {
-    decl String:Type[SP_MAXLEN_TYPE], String:ArrayString[SP_MAXLEN_TYPE];
-    GetNativeString(1, Type, sizeof(Type));
+    decl String:sType[SP_MAXLEN_TYPE], String:sArrayString[SP_MAXLEN_TYPE];
+    GetNativeString(1, sType, sizeof(sType));
 
     for(new i = 0; i<GetArraySize(g_hRegPunishPlugins);i++)
     {
-        GetArrayString(g_hRegPunishTypes, i, ArrayString, sizeof(ArrayString));
-        if(StrEqual(ArrayString, Type) && plugin == GetArrayCell(g_hRegPunishPlugins, i))
+        GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
+        if(StrEqual(sArrayString, sType) && plugin == GetArrayCell(g_hRegPunishPlugins, i))
         {
             return false;
         }
     }
     PushArrayCell(g_hRegPunishPlugins, plugin);
-    PushArrayString(g_hRegPunishTypes, Type);
+    PushArrayString(g_hRegPunishTypes, sType);
     PushArrayCell(g_hRegPunishCallbacks, GetNativeCell(2));
     return true;
 }
 
 public N_SP_DeRegPunishForward(Handle:plugin, numParams) {
-    decl String:Type[SP_MAXLEN_TYPE], String:ArrayString[SP_MAXLEN_TYPE];
-    GetNativeString(1, Type, sizeof(Type));
+    decl String:sType[SP_MAXLEN_TYPE], String:sArrayString[SP_MAXLEN_TYPE];
+    GetNativeString(1, sType, sizeof(sType));
     
     for(new i = 0; i<GetArraySize(g_hRegPunishTypes);i++)
     {
-        GetArrayString(g_hRegPunishTypes, i, ArrayString, sizeof(ArrayString));
-        if(StrEqual(ArrayString, Type) && plugin == GetArrayCell(g_hRegPunishPlugins, i))
+        GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
+        if(StrEqual(sArrayString, sType) && plugin == GetArrayCell(g_hRegPunishPlugins, i))
         {
             RemoveFromArray(g_hRegPunishPlugins, i);
             RemoveFromArray(g_hRegPunishTypes, i);
@@ -211,52 +213,51 @@ public N_SP_DeRegPunishForward(Handle:plugin, numParams) {
 
 public OnClientAuthorized(client, const String:auth[])
 {
-    decl String:query[512], String:safeauth[SP_MAXLEN_AUTH*2], String:clientIP[SP_MAXLEN_IP], String:safeclientIP[SP_MAXLEN_IP*2];
-    GetClientIP(client, clientIP, sizeof(clientIP));
-    SQL_EscapeString(g_hSQL, clientIP, safeclientIP, sizeof(safeclientIP));
-    SQL_EscapeString(g_hSQL, auth, safeauth, sizeof(safeauth));
-    Format(query, sizeof(query), "SELECT Punish_Type, Punish_Time, Punish_Length, Punish_Auth_Type, Punish_Reason FROM %s%s WHERE ((Punish_Time + (Punish_Length*60)) > %d OR Punish_Length = 0) AND UnPunish = 0 AND (Punish_Player_ID = '%s' OR Punish_Player_IP = '%s') AND IF(Punish_All_Servers=1, IF(Punish_All_Mods=0, Punish_Server_ID IN (SELECT ID FROM sp_servers WHERE Server_Mod = %d), 1), Punish_Server_ID=%d)", g_sDBPrefix, SP_DB_NAME, GetTime(), safeauth, safeclientIP, g_iModID, g_iServerID);
-    SQL_TQuery(g_hSQL, Query_ClientAuthFetch, query, GetClientUserId(client));
+    decl String:sQuery[512], String:sSafeAuth[SP_MAXLEN_AUTH*2], String:sClientIP[SP_MAXLEN_IP], String:sSafeClientIP[SP_MAXLEN_IP*2];
+    GetClientIP(client, sClientIP, sizeof(sClientIP));
+    SQL_EscapeString(g_hSQL, sClientIP, sSafeClientIP, sizeof(sSafeClientIP));
+    SQL_EscapeString(g_hSQL, auth, sSafeAuth, sizeof(sSafeAuth));
+    Format(sQuery, sizeof(sQuery), "SELECT Punish_Type, Punish_Time, Punish_Length, Punish_Auth_Type, Punish_Reason FROM %s%s WHERE ((Punish_Time + (Punish_Length*60)) > %d OR Punish_Length = 0) AND UnPunish = 0 AND (Punish_Player_ID = '%s' OR Punish_Player_IP = '%s') AND IF(Punish_All_Servers=1, IF(Punish_All_Mods=0, Punish_Server_ID IN (SELECT ID FROM sp_servers WHERE Server_Mod = %d), 1), Punish_Server_ID=%d) ORDER BY Punish_Length DESC", g_sDBPrefix, SP_DB_NAME, GetTime(), sSafeAuth, sSafeClientIP, g_iModID, g_iServerID);
+    SQL_TQuery(g_hSQL, Query_ClientAuthFetch, sQuery, GetClientUserId(client));
 }
 
 public Query_ClientAuthFetch(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
     if (hndl == INVALID_HANDLE)
     {
-        LogError("Database Error in SQL_ClientAuthFetch: %s", error);
+        LogError("Database Error in Query_ClientAuthFetch: %s", error);
         return;
     }
-
     new client = GetClientOfUserId(userid);
     if (client == 0)
         return;
 
-    decl String:reason[SP_MAXLEN_REASON], String:type[SP_MAXLEN_TYPE];
-    new starttime;
-    new length;
-    new authtype;
+    decl String:sReason[SP_MAXLEN_REASON], String:sType[SP_MAXLEN_TYPE];
+    new iStartTime;
+    new iLength;
+    new iAuthType;
     while (SQL_FetchRow(hndl))
-    {
-        SQL_FetchString(hndl, 0, type, sizeof(type));
-        starttime = SQL_FetchInt(hndl, 1);
-        length = SQL_FetchInt(hndl, 2);
-        authtype = SQL_FetchInt(hndl, 3);
-        SQL_FetchString(hndl, 4, reason, sizeof(reason));
+    {  
+        SQL_FetchString(hndl, 0, sType, sizeof(sType));
+        iStartTime = SQL_FetchInt(hndl, 1);
+        iLength = SQL_FetchInt(hndl, 2);
+        iAuthType = SQL_FetchInt(hndl, 3);
+        SQL_FetchString(hndl, 4, sReason, sizeof(sReason));
         
-        decl String:ArrayString[SP_MAXLEN_TYPE];
+        decl String:sArrayString[SP_MAXLEN_TYPE];
         for(new i = 0; i<GetArraySize(g_hRegPunishTypes);i++)
         {
-            GetArrayString(g_hRegPunishTypes, i, ArrayString, sizeof(ArrayString));
-            if(StrEqual(ArrayString, type))
+            GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
+            if(StrEqual(sArrayString, sType))
             {
                 new Handle:f = CreateForward(ET_Ignore, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_String);
                 AddToForward(f, GetArrayCell(g_hRegPunishPlugins, i), Function:GetArrayCell(g_hRegPunishCallbacks, i));
                 Call_StartForward(f);
                 Call_PushCell(userid);
-                Call_PushCell(starttime);
-                Call_PushCell(length);
-                Call_PushCell(authtype);
-                Call_PushString(reason);
+                Call_PushCell(iStartTime);
+                Call_PushCell(iLength);
+                Call_PushCell(iAuthType);
+                Call_PushString(sReason);
                 Call_Finish();
                 CloseHandle(f);
             }
@@ -266,33 +267,51 @@ public Query_ClientAuthFetch(Handle:owner, Handle:hndl, const String:error[], an
 
 public N_SP_DB_AddPunish(Handle:plugin, numparams)
 {
-    decl String:PunishType[SP_MAXLEN_TYPE], String:PunishReason[SP_MAXLEN_REASON];
+    decl String:sPunishType[SP_MAXLEN_TYPE], String:sPunishReason[SP_MAXLEN_REASON];
 
     new PunishedUserID = GetNativeCell(1);
     new PunisherUserID = GetNativeCell(2);
     new PunishLength = GetNativeCell(3);
     new PunishAuthType = GetNativeCell(4);
-    GetNativeString(5, PunishType, sizeof(PunishType));
-    GetNativeString(6, PunishReason, sizeof(PunishReason));
+    GetNativeString(5, sPunishType, sizeof(sPunishType));
+    GetNativeString(6, sPunishReason, sizeof(sPunishReason));
 
     new Punished = GetClientOfUserId(PunishedUserID);
     new Punisher = GetClientOfUserId(PunisherUserID);
 
-    decl String:PunishedName[SP_MAXLEN_NAME], String:PunishedAuth[SP_MAXLEN_AUTH], String:PunishedIP[SP_MAXLEN_IP], String:PunisherName[SP_MAXLEN_NAME], String:PunisherAuth[SP_MAXLEN_AUTH];
+    decl String:sPunishedName[SP_MAXLEN_NAME], String:sPunishedAuth[SP_MAXLEN_AUTH], String:sPunishedIP[SP_MAXLEN_IP], String:sPunisherName[SP_MAXLEN_NAME], String:sPunisherAuth[SP_MAXLEN_AUTH];
 
-    GetClientName(Punished, PunishedName, sizeof(PunishedName));
-    GetClientName(Punisher, PunisherName, sizeof(PunisherName));
-    GetClientAuthString(Punished, PunishedAuth, sizeof(PunishedAuth));
-    GetClientAuthString(Punisher, PunisherAuth, sizeof(PunisherAuth));
-    GetClientIP(Punished, PunishedIP, sizeof(PunishedIP));
+    GetClientName(Punished, sPunishedName, sizeof(sPunishedName));
+    GetClientName(Punisher, sPunisherName, sizeof(sPunisherName));
+    GetClientAuthString(Punished, sPunishedAuth, sizeof(sPunishedAuth));
+    GetClientAuthString(Punisher, sPunisherAuth, sizeof(sPunisherAuth));
+    GetClientIP(Punished, sPunishedIP, sizeof(sPunishedIP));
 
-    decl String:SPunishedName[SP_MAXLEN_NAME*2], String:SPunishedAuth[SP_MAXLEN_AUTH*2], String:SPunishedIP[SP_MAXLEN_IP*2], String:SPunisherName[SP_MAXLEN_NAME*2], String:SPunisherAuth[SP_MAXLEN_AUTH*2], String:SPunishReason[SP_MAXLEN_REASON*2], String:SPunishType[SP_MAXLEN_TYPE*2], String:SPunishLength[20];
+    decl String:sSPunishedName[SP_MAXLEN_NAME*2], String:sSPunishedAuth[SP_MAXLEN_AUTH*2], String:sSPunishedIP[SP_MAXLEN_IP*2], String:sSPunisherName[SP_MAXLEN_NAME*2], String:sSPunisherAuth[SP_MAXLEN_AUTH*2], String:sSPunishReason[SP_MAXLEN_REASON*2], String:sSPunishType[SP_MAXLEN_TYPE*2], String:sSPunishLength[20];
 
-    SQL_EscapeString(g_hSQL, PunishedName, SPunishedName, sizeof(SPunishedName));
-    SQL_EscapeString(g_hSQL, PunisherName, SPunisherName, sizeof(SPunisherName));
-    SQL_EscapeString(g_hSQL, PunishedAuth, SPunishedAuth, sizeof(SPunishedAuth));
-    SQL_EscapeString(g_hSQL, PunisherAuth, SPunisherAuth, sizeof(SPunisherAuth));
-    SQL_EscapeString(g_hSQL, PunishedIP, SPunishedIP, sizeof(SPunishedIP));
-    SQL_EscapeString(g_hSQL, PunishType, SPunishType, sizeof(SPunishType));
-    SQL_EscapeString(g_hSQL, PunishReason, SPunishReason, sizeof(SPunishReason));
+    SQL_EscapeString(g_hSQL, sPunishedName, sSPunishedName, sizeof(sSPunishedName));
+    SQL_EscapeString(g_hSQL, sPunisherName, sSPunisherName, sizeof(sSPunisherName));
+    SQL_EscapeString(g_hSQL, sPunishedAuth, sSPunishedAuth, sizeof(sSPunishedAuth));
+    SQL_EscapeString(g_hSQL, sPunisherAuth, sSPunisherAuth, sizeof(sSPunisherAuth));
+    SQL_EscapeString(g_hSQL, sPunishedIP, sSPunishedIP, sizeof(sSPunishedIP));
+    SQL_EscapeString(g_hSQL, sPunishType, sSPunishType, sizeof(sSPunishType));
+    SQL_EscapeString(g_hSQL, sPunishReason, sSPunishReason, sizeof(sSPunishReason));
+    
+    new iSPunishAuthType = 0;
+    if(PunishAuthType == 1)
+        iSPunishAuthType = 1;
+    
+    decl String:sQuery[512];
+    Format(sQuery, sizeof(sQuery), "INSERT INTO %s%s (Punish_Time, Punish_Server_ID, Punish_Player_Name, Punish_Player_ID, Punish_Player_IP, Punish_Auth_Type, Punish_Type, Punish_Length, Punish_Reason, Punish_All_Servers, Punish_All_Mods, Punish_Admin_Name, Punish_Admin_ID) VALUES (%d, %d, '%s', '%s', '%s', %d, '%s', %d, '%s', %d, %d, '%s', '%s')", g_sDBPrefix, SP_DB_NAME, GetTime(), g_iServerID, sSPunishedName, sSPunishedAuth, sSPunishedIP, iSPunishAuthType, sSPunishType, PunishLength, sSPunishReason, g_bPunishAllServers, g_bPunishAllMods, sSPunisherName, sSPunisherAuth);
+    //Format(sQuery, sizeof(sQuery), "%s VALUES (%d, %d, '%s', '%s', '%s', %d, '%s', %d, '%s', %d, %d, '%s', '%s')", sQuery, GetTime(), g_iServerID, sSPunishedName, sSPunishedAuth, sSPunishedIP, iSPunishAuthType, sSPunishType, PunishLength, sSPunishReason, g_bPunishAllServers, g_bPunishAllMods, sSPunisherName, sSPunisherAuth);
+    SQL_TQuery(g_hSQL, Query_AddPunish, sQuery, 0);
+}
+
+public Query_AddPunish(Handle:owner, Handle:hndl, const String:error[], any:data)
+{
+    if (hndl == INVALID_HANDLE)
+    {
+        LogError("Database Error in Query_AddPunish: %s", error);
+        return;
+    }
 }
