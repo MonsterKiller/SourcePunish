@@ -1,0 +1,26 @@
+"Phrases"
+{
+	"SP Kick Queue"
+	{
+		"en"			"Player not kickable, already in kick queue"
+	}
+	"SP Kick"
+	{
+		"#format"		"{1:s}"
+		"en"			"kicked \"{1}\""
+	}
+	"SP Kick Reason"
+	{
+		"#format"		"{1:s},{2:s}"
+		"en"			"kicked \"{1}\" ({2})"
+	}
+	"SP Kick Noname"
+	{
+		"en"			"kicked by admin"
+	}
+	"SP Kick Noname Reason"
+	{
+		"#format"		"{1:s}"
+		"en"			"kicked ({1})"
+	}
+}

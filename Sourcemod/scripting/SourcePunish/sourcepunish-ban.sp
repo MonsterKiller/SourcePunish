@@ -7,7 +7,7 @@ public Plugin:myinfo =
 {
     name = "SourcePunish -> Ban",
     author = "Monster Killer",
-    description = "Punishment tool",
+    description = "SourcePunish ban module",
     version = SP_PLUGIN_VERSION,
     url = SP_PLUGIN_URL
 };
@@ -69,10 +69,10 @@ public Action:Command_Ban(client, args)
         
     } else if(args < 2 || args > 3)
     {
-		ReplyToCommand(client, "%s Usage: sm_ban <#userid|name> <time> [reason]", SP_PREFIX);
+		ReplyToCommand(client, "%sUsage: sm_ban <#userid|name> <time> [reason]", SP_PREFIX);
 		return Plugin_Handled;
     } else {
-        decl String:sPlayer[SP_MAXLEN_NAME], String:sLength[15], String:sReason[SP_MAXLEN_REASON];
+        decl String:sPlayer[MAX_TARGET_LENGTH], String:sLength[15], String:sReason[SP_MAXLEN_REASON];
         GetCmdArg(1, sPlayer, sizeof(sPlayer));
         GetCmdArg(2, sLength, sizeof(sLength));
         GetCmdArg(3, sReason, sizeof(sReason));

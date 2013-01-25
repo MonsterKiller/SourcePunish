@@ -1,14 +1,13 @@
 #define SP_PLUGIN_VERSION "0.1.0"
 #define SP_PLUGIN_URL "http://sourcepunish.net"
-#define SP_PREFIX "[\x07FF0000SP\x01]"
-#define SP_PREFIX_NOCOLOR "[SP]"
+#define SP_PREFIX "\x01[\x07FE4444SP\x01] "
+#define SP_PREFIX_NOCOLOR "[SP] "
 #define SP_DB_NAME "punish"
 #define SP_DB_NAME_SERVER "servers"
 
 #define SP_MAXLEN_TIME 80 // The maximum length of a time string
 #define SP_MAXLEN_TYPE 20 // The maximum length of a type string
 #define SP_MAXLEN_REASON 70 // The maximum length of a reason string
-#define SP_MAXLEN_NAME 60 // The maximum length of a clients name string
 #define SP_MAXLEN_AUTH 64 // The maximum length of a client auth string
 #define SP_MAXLEN_IP 15 // The maximum length of a client IP string
 
@@ -83,6 +82,18 @@ native SP_TimeToString(time, String:timestring[], maxlen);
  * @param PunishAuthType Punish by SteamID (0) or IP address (1).
  * @param PunishType     Punishment to apply as a string (E.G. "kick").
  * @param PunishReason   Reason the player is being punished.
+ * @noreturn
+ */
+native SP_DB_AddPunish(PunishedID, PunisherID, PunishTime, PunishAuthType, const String:PunishType[], const String:PunishReason[]);
+
+/**
+ * Unpunish a player in the SQL database
+ *
+ * @param PunishedID     UserID of the player to unpunish.
+ * @param PunisherID     UserID of the unpunisher.
+ * @param PunishAuthType Unpunish by SteamID (0) or IP address (1).
+ * @param PunishType     Punishment to unpunish as a string (E.G. "mute").
+ * @param PunishReason   Reason the player is being unpunished.
  * @return               True on success, else false.
  */
-native bool:SP_DB_AddPunish(PunishedID, PunisherID, PunishTime, PunishAuthType, const String:PunishType[], const String:PunishReason[]);
+native SP_DB_UnPunish(PunishedID, PunisherID, PunishAuthType, const String:PunishType[], const String:PunishReason[]);
