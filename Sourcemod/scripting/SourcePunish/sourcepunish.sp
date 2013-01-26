@@ -3,8 +3,6 @@
 #include <sourcepunish>
 #include <sourcemod>
 #include <sdktools>
-#undef REQUIRE_PLUGIN
-//#include <adminmenu>
 
 new Handle:g_hRegPunishPlugins;
 new Handle:g_hRegPunishTypes;
@@ -66,6 +64,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
     CreateNative("SP_RegPunishForward", N_SP_RegPunishForward);
     CreateNative("SP_DeRegPunishForward", N_SP_DeRegPunishForward);
     CreateNative("SP_DB_AddPunish", N_SP_DB_AddPunish);
+    CreateNative("SP_DB_UnPunish", N_SP_DB_AddPunish);
     RegPluginLibrary("sourcepunish");
     return APLRes_Success;
 }
@@ -83,6 +82,8 @@ SP_LoadConfig()
         SetFailState("SourcePunish - sourcepunish.cfg - settings not found!");
 
     g_iServerID = KvGetNum(g_hKV, "ServerID", 0);
+    if(g_iServerID > 1)
+        SetFailState("SourcePunish - sourcepunish.cfg - invalud server id!");
     g_bPunishAllServers = KvGetNum(g_hKV, "PunishFromAllServers", 1);
     if(g_bPunishAllServers != 1) g_bPunishAllServers = 0;
     g_bPunishAllMods = KvGetNum(g_hKV, "PunishFromAllMods", 0);
@@ -95,7 +96,7 @@ SP_LoadConfig()
 SP_LoadDB()
 {
     if(!SQL_CheckConfig("sourcepunish"))
-        SetFailState("SourcePunish - Could not find database conf \"sourcepunish\"");
+        SetFailState("SourcePunish - Could not find database confing \"sourcepunish\"");
     else
         SQL_TConnect(SQLConnect, "sourcepunish");
 }
@@ -183,9 +184,7 @@ public N_SP_RegPunishForward(Handle:plugin, numParams) {
     {
         GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
         if(StrEqual(sArrayString, sType) && plugin == GetArrayCell(g_hRegPunishPlugins, i))
-        {
             return false;
-        }
     }
     PushArrayCell(g_hRegPunishPlugins, plugin);
     PushArrayString(g_hRegPunishTypes, sType);
@@ -209,6 +208,12 @@ public N_SP_DeRegPunishForward(Handle:plugin, numParams) {
         }
     }
     return false;
+}
+
+public N_SP_ClientHasAvtivePunishment(Handle:plugin, numParams)
+{
+    // need Auth, IP, PunishType, callback
+    // possibly allow this to check all connected clients for when the plugin is loaded mid-game?
 }
 
 public OnClientAuthorized(client, const String:auth[])

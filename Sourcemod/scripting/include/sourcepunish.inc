@@ -1,4 +1,4 @@
-#define SP_PLUGIN_VERSION "0.1.0"
+#define SP_PLUGIN_VERSION "0.0.04"
 #define SP_PLUGIN_URL "http://sourcepunish.net"
 #define SP_PREFIX "\x01[\x07FE4444SP\x01] "
 #define SP_PREFIX_NOCOLOR "[SP] "
@@ -7,9 +7,9 @@
 
 #define SP_MAXLEN_TIME 80 // The maximum length of a time string
 #define SP_MAXLEN_TYPE 20 // The maximum length of a type string
-#define SP_MAXLEN_REASON 70 // The maximum length of a reason string
+#define SP_MAXLEN_REASON 71 // The maximum length of a reason string
 #define SP_MAXLEN_AUTH 64 // The maximum length of a client auth string
-#define SP_MAXLEN_IP 15 // The maximum length of a client IP string
+#define SP_MAXLEN_IP 40 // The maximum length of a client IP string
 
 public SharedPlugin:__pl_sourcepunish = 
 {
@@ -28,6 +28,7 @@ public __pl_sourcepunish_SetNTVOptional()
 	MarkNativeAsOptional("SP_DeRegPunishForward");
 	MarkNativeAsOptional("SP_TimeToString");
 	MarkNativeAsOptional("SP_DB_AddPunish");
+	MarkNativeAsOptional("SP_DB_UnPunish");
 }
 
 /**
@@ -89,11 +90,11 @@ native SP_DB_AddPunish(PunishedID, PunisherID, PunishTime, PunishAuthType, const
 /**
  * Unpunish a player in the SQL database
  *
- * @param PunishedID     UserID of the player to unpunish.
- * @param PunisherID     UserID of the unpunisher.
- * @param PunishAuthType Unpunish by SteamID (0) or IP address (1).
- * @param PunishType     Punishment to unpunish as a string (E.G. "mute").
- * @param PunishReason   Reason the player is being unpunished.
- * @return               True on success, else false.
+ * @param PunishedID      UserID of the player to unpunish.
+ * @param UnPunisherID    UserID of the unpunisher.
+ * @param PunishAuthType  Unpunish by SteamID (0) or IP address (1).
+ * @param PunishType      Punishment to unpunish as a string (E.G. "mute").
+ * @param UnPunishReason  Reason the player is being unpunished.
+ * @noreturn
  */
-native SP_DB_UnPunish(PunishedID, PunisherID, PunishAuthType, const String:PunishType[], const String:PunishReason[]);
+native SP_DB_UnPunish(PunishedID, UnPunisherID, PunishAuthType, const String:PunishType[], const String:UnPunishReason[]);
