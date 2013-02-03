@@ -4,6 +4,10 @@
 	{
 		"en"			"Player not kickable, already in kick queue"
 	}
+	"SP Kick Steam"
+	{
+		"en"			"Cannot find player to kick by that SteamID"
+	}
 	"SP Kick"
 	{
 		"#format"		"{1:s}"

@@ -32,7 +32,6 @@ public OnPluginStart()
     CreateConVar("sourcepunish_version", SP_PLUGIN_VERSION, "Current version of SourcePunish", FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_SPONLY|FCVAR_NOTIFY);
 
     SP_LoadConfig();
-    //SP_LoadDB();
     
     g_hRegPunishPlugins = CreateArray();
     g_hRegPunishTypes = CreateArray(SP_MAXLEN_TYPE);
@@ -89,6 +88,8 @@ SP_LoadConfig()
     g_bPunishAllMods = KvGetNum(g_hKV, "PunishFromAllMods", 0);
     if(g_bPunishAllMods != 0) g_bPunishAllMods = 1;
     KvGetString(g_hKV, "DBPrefix", g_sDBPrefix, sizeof(g_sDBPrefix));
+    
+    // We should also load a list of punishment times & reasons to create a menu hadle to use with a native
 
     SP_LoadDB();
 }
@@ -176,10 +177,21 @@ public N_SP_TimeToString(Handle:plugin, numparams)
     SetNativeString(2, sTimeString, iMaxlen);
 }
 
+public N_SP_MenuTimes(Handle:plugin, numparams)
+{
+    // return a global handle for menu times
+    return;
+}
+
+public N_SP_MenuReasons(Handle:plugin, numparams)
+{
+    // return a global handle for menu reasons
+    return;
+}
+
 public N_SP_RegPunishForward(Handle:plugin, numParams) {
     decl String:sType[SP_MAXLEN_TYPE], String:sArrayString[SP_MAXLEN_TYPE];
     GetNativeString(1, sType, sizeof(sType));
-
     for(new i = 0; i<GetArraySize(g_hRegPunishPlugins);i++)
     {
         GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
@@ -195,7 +207,6 @@ public N_SP_RegPunishForward(Handle:plugin, numParams) {
 public N_SP_DeRegPunishForward(Handle:plugin, numParams) {
     decl String:sType[SP_MAXLEN_TYPE], String:sArrayString[SP_MAXLEN_TYPE];
     GetNativeString(1, sType, sizeof(sType));
-    
     for(new i = 0; i<GetArraySize(g_hRegPunishTypes);i++)
     {
         GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
@@ -248,7 +259,6 @@ public Query_ClientAuthFetch(Handle:owner, Handle:hndl, const String:error[], an
         iLength = SQL_FetchInt(hndl, 2);
         iAuthType = SQL_FetchInt(hndl, 3);
         SQL_FetchString(hndl, 4, sReason, sizeof(sReason));
-        
         decl String:sArrayString[SP_MAXLEN_TYPE];
         for(new i = 0; i<GetArraySize(g_hRegPunishTypes);i++)
         {
@@ -305,8 +315,7 @@ public N_SP_DB_AddPunish(Handle:plugin, numparams)
     new iSPunishAuthType = 0;
     if(PunishAuthType == 1)
         iSPunishAuthType = 1;
-    
-    PrintToServer("*** DEBUG *** Autht: %d", iSPunishAuthType);
+
     decl String:sQuery[512];
     Format(sQuery, sizeof(sQuery), "INSERT INTO %s%s (Punish_Time, Punish_Server_ID, Punish_Player_Name, Punish_Player_ID, Punish_Player_IP, Punish_Auth_Type, Punish_Type, Punish_Length, Punish_Reason, Punish_All_Servers, Punish_All_Mods, Punish_Admin_Name, Punish_Admin_ID) VALUES (%d, %d, '%s', '%s', '%s', %d, '%s', %d, '%s', %d, %d, '%s', '%s')", g_sDBPrefix, SP_DB_NAME, GetTime(), g_iServerID, sSPunishedName, sSPunishedAuth, sSPunishedIP, iSPunishAuthType, sSPunishType, PunishLength, sSPunishReason, g_bPunishAllServers, g_bPunishAllMods, sSPunisherName, sSPunisherAuth);
     SQL_TQuery(g_hSQL, Query_AddPunish, sQuery, 0);
