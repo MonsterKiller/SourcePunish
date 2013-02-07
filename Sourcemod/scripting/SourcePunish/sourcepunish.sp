@@ -11,6 +11,8 @@ new Handle:g_hRegPunishCallbacks;
 new Handle:g_hKV;
 new Handle:g_hSQL = INVALID_HANDLE;
 
+new Handle:g_hrSteamID;
+
 new g_iServerID;
 new g_iModID;
 new g_bPunishAllServers;
@@ -59,6 +61,7 @@ public OnPluginEnd()
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 {
+    CreateNative("SP_FindTarget", N_SP_FindTarget);
     CreateNative("SP_TimeToString", N_SP_TimeToString);
     CreateNative("SP_RegPunishForward", N_SP_RegPunishForward);
     CreateNative("SP_DeRegPunishForward", N_SP_DeRegPunishForward);
@@ -90,6 +93,8 @@ SP_LoadConfig()
     KvGetString(g_hKV, "DBPrefix", g_sDBPrefix, sizeof(g_sDBPrefix));
     
     // We should also load a list of punishment times & reasons to create a menu hadle to use with a native
+    
+    g_hrSteamID = CompileRegex("(\\{STEAM_([0-7]):([01]):([0-9]{7-10})\\})", PCRE_CASELESS); //future proofed
 
     SP_LoadDB();
 }
@@ -132,6 +137,51 @@ public Query_LoadConf(Handle:owner, Handle:hndl, const String:error[], any:data)
     }
     SQL_FetchRow(hndl);
     g_iModID = SQL_FetchInt(hndl, 0);
+}
+
+public N_SP_FindTarget(Handle:plugin, numparams)
+{
+    decl String:sTarget[MAX_TARGET_LENGTH], String:sTargetString[MAX_TARGET_LENGTH];
+    new iTriggerClient = GetNativeCell(1);
+    GetNativeString(2, sTarget, sizeof(sTarget));
+    new bool:bSteamID = GetNativeCell(3);
+    new bool:bBots = GetNativeCell(4);
+    new bool:bImmunity = GetNativeCell(5);
+
+    new flags = COMMAND_FILTER_NO_MULTI;
+    if (bBots)
+        flags |= COMMAND_FILTER_NO_BOTS;
+    if (!bImmunity)
+        flags |= COMMAND_FILTER_NO_IMMUNITY;
+
+    decl TargetList[1], TargetCount, bool:tn_is_ml;
+
+    if ((TargetCount = ProcessTargetString(sTarget, iTriggerClient, TargetList, 1, flags, sTargetString, sizeof(sTargetString), tn_is_ml)) > 0)
+        return TargetList[0];
+    if(bSteamID) {
+        if(MatchRegex(g_hrSteamID, sTarget)
+        {
+            decl String:sTempAuth[SP_MAXLEN_AUTH];
+            for(new i = 1; i<= MAXPLAYERS; i++)
+            {
+                GetClientAuthString(i, sTempAuth, sizeof(sTempAuth));
+                if(StrEqual(sTarget, sTempAuth, false))
+                {
+                    if(CanAdminTarget(iTriggerClient, i))
+                    {
+                        if(IsFakeClient(i))
+                        {
+                            if(bBots)
+                                return i;
+                        } else
+                            return i;
+                    }
+                }
+            }
+        }
+    }
+    PrintToChat(iTriggerClient, "Target not found, do translation here");
+    return -1;
 }
 
 public N_SP_TimeToString(Handle:plugin, numparams)

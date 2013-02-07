@@ -24,12 +24,25 @@ public SharedPlugin:__pl_sourcepunish =
  
 public __pl_sourcepunish_SetNTVOptional()
 {
+	MarkNativeAsOptional("SP_FindTarget");
 	MarkNativeAsOptional("SP_RegPunishForward");
 	MarkNativeAsOptional("SP_DeRegPunishForward");
 	MarkNativeAsOptional("SP_TimeToString");
 	MarkNativeAsOptional("SP_DB_AddPunish");
 	MarkNativeAsOptional("SP_DB_UnPunish");
 }
+
+/**
+ * Find a target
+ *
+ * @param client	Client who issued command
+ * @param target	Client's target argument
+ * @param steamid	Optional. Allow search by SteamID
+ * @param nobots	Optional. Set to true if bots should NOT be targetted
+ * @param immunity	Optional. Set to false to ignore target immunity.
+ * @return			Index of target client, or -1 on error.
+ */
+native SP_FindTarget(client, const String:target[], bool:steamid=true, bool:nobots = false, bool:immunity = true);
 
 /**
  * Called when a player joins with an active punishment.
