@@ -27,6 +27,7 @@ public __pl_sourcepunish_SetNTVOptional()
 	MarkNativeAsOptional("SP_FindTarget");
 	MarkNativeAsOptional("SP_RegPunishForward");
 	MarkNativeAsOptional("SP_DeRegPunishForward");
+	MarkNativeAsOptional("SP_RegMenuItem");
 	MarkNativeAsOptional("SP_TimeToString");
 	MarkNativeAsOptional("SP_DB_AddPunish");
 	MarkNativeAsOptional("SP_DB_UnPunish");
@@ -42,7 +43,7 @@ public __pl_sourcepunish_SetNTVOptional()
  * @param immunity	Optional. Set to false to ignore target immunity.
  * @return			Index of target client, or -1 on error.
  */
-native SP_FindTarget(client, const String:target[], bool:steamid=true, bool:nobots = false, bool:immunity = true);
+native SP_FindTarget(client, const String:target[], bool:steamid=true, bool:nobots = true, bool:immunity = true);
 
 /**
  * Called when a player joins with an active punishment.
@@ -74,6 +75,24 @@ native bool:SP_RegPunishForward(const String:type[], SPClientConnect:callback);
 native bool:SP_DeRegPunishForward(const String:type[]);
 
 /**
+ * Register a command to include on the SourcePunish admin menu
+ *
+ * @param ItemCommand   The command that will be run from the menu item
+ * @param ItemName      The name to give the item in the menu
+ * @param RequiredFlag  The admin flag required to use the command
+ * @return              True if succesfully registerd, false otherwise
+ */
+native bool:SP_RegMenuItem(const String:ItemCommand[], const String:ItemName[], RequiredFlag);
+
+/**
+ * Deregister a command frome the SourcePunish admin menu
+ *
+ * @param ItemCommand   The command that will be removed from the menu item
+ * @return              True if succesfully deregisterd, false otherwise
+ */
+native bool:SP_DeRegMenuItem(const String:ItemCommand[]);
+
+/**
  * Called when the main plugin is loaded
 **/
 forward SP_Loaded();
@@ -84,21 +103,31 @@ forward SP_Loaded();
  * @param time        Time int
  * @param timestring  String to store formatted time in
  * @param maxlen      Maximum length of the timestring
+ * @noreturn
  */
 native SP_TimeToString(time, String:timestring[], maxlen);
 
 /**
+ * Converts a number string to an int and does error handling
+ *
+ * @param time    Time string
+ * @param client  The client to reply to with errors, -1 = no reply
+ * @return        Time as an integer, -1 on failure
+ */
+native SP_StringToTime(String:time[], client = -1);
+
+/**
  * Log a punishment in the SQL database
  *
- * @param PunishedID     UserID of the punished player.
- * @param PunisherID     UserID of the punisher.
+ * @param Punished       Client index of the punished player.
+ * @param Punisher       Client index of the punisher.
  * @param PunishTime     Time (in minutes) the punishment should last, -1 if no time (E.G. a kick).
  * @param PunishAuthType Punish by SteamID (0) or IP address (1).
  * @param PunishType     Punishment to apply as a string (E.G. "kick").
  * @param PunishReason   Reason the player is being punished.
  * @noreturn
  */
-native SP_DB_AddPunish(PunishedID, PunisherID, PunishTime, PunishAuthType, const String:PunishType[], const String:PunishReason[]);
+native SP_DB_AddPunish(Punished, Punisher, PunishTime, PunishAuthType, const String:PunishType[], const String:PunishReason[]);
 
 /**
  * Unpunish a player in the SQL database

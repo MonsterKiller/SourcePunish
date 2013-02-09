@@ -3,10 +3,16 @@
 #include <sourcepunish>
 #include <sourcemod>
 #include <sdktools>
+#include <regex>
 
 new Handle:g_hRegPunishPlugins;
 new Handle:g_hRegPunishTypes;
 new Handle:g_hRegPunishCallbacks;
+
+new Handle:g_hRegMenuPlugins;
+new Handle:g_hRegMenuItems;
+new Handle:g_hRegMenuCommands;
+new Handle:g_hRegMenuFlags;
 
 new Handle:g_hKV;
 new Handle:g_hSQL = INVALID_HANDLE;
@@ -38,8 +44,12 @@ public OnPluginStart()
     g_hRegPunishPlugins = CreateArray();
     g_hRegPunishTypes = CreateArray(SP_MAXLEN_TYPE);
     g_hRegPunishCallbacks = CreateArray();
+    g_hRegMenuPlugins = CreateArray();
+    g_hRegMenuCommands = CreateArray();
+    g_hRegMenuItems = CreateArray(SP_MAXLEN_TYPE);
+    g_hRegMenuFlags = CreateArray();
 
-    //RegAdminCmd("sm_sp", Command_SP, ADMFLAG_KICK, "sp");
+    RegAdminCmd("sm_sp", Command_SP, ADMFLAG_GENERIC, "sp");
 }
 
 public OnAllPluginsLoaded()
@@ -55,6 +65,10 @@ public OnPluginEnd()
     ClearArray(g_hRegPunishPlugins);
     ClearArray(g_hRegPunishTypes);
     ClearArray(g_hRegPunishCallbacks);
+    ClearArray(g_hRegMenuPlugins);
+    ClearArray(g_hRegMenuCommands);
+    ClearArray(g_hRegMenuItems);
+    ClearArray(g_hRegMenuFlags);
     CloseHandle(g_hSQL);
     CloseHandle(g_hKV);
 }
@@ -63,8 +77,11 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 {
     CreateNative("SP_FindTarget", N_SP_FindTarget);
     CreateNative("SP_TimeToString", N_SP_TimeToString);
+    CreateNative("SP_StringToTime", N_SP_StringToTime);
     CreateNative("SP_RegPunishForward", N_SP_RegPunishForward);
     CreateNative("SP_DeRegPunishForward", N_SP_DeRegPunishForward);
+    CreateNative("SP_RegMenuItem", N_SP_RegMenuItem);
+    CreateNative("SP_DeRegMenuItem", N_SP_DeRegMenuItem);
     CreateNative("SP_DB_AddPunish", N_SP_DB_AddPunish);
     CreateNative("SP_DB_UnPunish", N_SP_DB_AddPunish);
     RegPluginLibrary("sourcepunish");
@@ -94,7 +111,7 @@ SP_LoadConfig()
     
     // We should also load a list of punishment times & reasons to create a menu hadle to use with a native
     
-    g_hrSteamID = CompileRegex("(\\{STEAM_([0-7]):([01]):([0-9]{7-10})\\})", PCRE_CASELESS); //future proofed
+    g_hrSteamID = CompileRegex("STEAM_[0-7]:[01]:[0-9]{7,10}", PCRE_CASELESS); //future proofed
 
     SP_LoadDB();
 }
@@ -145,42 +162,67 @@ public N_SP_FindTarget(Handle:plugin, numparams)
     new iTriggerClient = GetNativeCell(1);
     GetNativeString(2, sTarget, sizeof(sTarget));
     new bool:bSteamID = GetNativeCell(3);
-    new bool:bBots = GetNativeCell(4);
+    new bool:bNoBots = GetNativeCell(4);
     new bool:bImmunity = GetNativeCell(5);
 
     new flags = COMMAND_FILTER_NO_MULTI;
-    if (bBots)
-        flags |= COMMAND_FILTER_NO_BOTS;
-    if (!bImmunity)
-        flags |= COMMAND_FILTER_NO_IMMUNITY;
+    flags |= COMMAND_FILTER_NO_IMMUNITY;
 
-    decl TargetList[1], TargetCount, bool:tn_is_ml;
+    decl TargetList[1], bool:tn_is_ml;
 
-    if ((TargetCount = ProcessTargetString(sTarget, iTriggerClient, TargetList, 1, flags, sTargetString, sizeof(sTargetString), tn_is_ml)) > 0)
+    if(ProcessTargetString(sTarget, iTriggerClient, TargetList, 1, flags, sTargetString, sizeof(sTargetString), tn_is_ml) > 0)
+    {
+        if(bImmunity)
+        {
+            if(!(CanUserTarget(iTriggerClient, TargetList[0])))
+            {
+                if(iTriggerClient == 0)
+                    ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX_NOCOLOR, "SP Cannot Target");
+                else if(iTriggerClient > 0)
+                    ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX, "SP Cannot Target");
+                return -1;
+            }
+        }
+        if(bNoBots)
+        {
+            if(IsFakeClient(TargetList[0]))
+            {
+                if(iTriggerClient == 0)
+                    ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX_NOCOLOR, "SP Cannot Target Bot");
+                else if(iTriggerClient > 0)
+                    ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX, "SP Cannot Target Bot");
+                return -1;
+            }
+        }
         return TargetList[0];
+    }
     if(bSteamID) {
-        if(MatchRegex(g_hrSteamID, sTarget)
+        if(MatchRegex(g_hrSteamID, sTarget))
         {
             decl String:sTempAuth[SP_MAXLEN_AUTH];
-            for(new i = 1; i<= MAXPLAYERS; i++)
+            for(new i = 1; i<= MaxClients; i++)
             {
+                if(!IsClientConnected(i))
+                    continue;
                 GetClientAuthString(i, sTempAuth, sizeof(sTempAuth));
                 if(StrEqual(sTarget, sTempAuth, false))
                 {
-                    if(CanAdminTarget(iTriggerClient, i))
-                    {
-                        if(IsFakeClient(i))
-                        {
-                            if(bBots)
-                                return i;
-                        } else
-                            return i;
+                    if(CanUserTarget(iTriggerClient, i))
+                        return i;
+                    else {
+                        if(iTriggerClient == 0)
+                            ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX_NOCOLOR, "SP Cannot Target");
+                        else if(iTriggerClient > 0)
+                            ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX, "SP Cannot Target");
                     }
                 }
             }
         }
     }
-    PrintToChat(iTriggerClient, "Target not found, do translation here");
+    if(iTriggerClient == 0)
+        ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX_NOCOLOR, "SP Bad Target");
+    else if(iTriggerClient > 0)
+        ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX, "SP Bad Target");
     return -1;
 }
 
@@ -227,15 +269,39 @@ public N_SP_TimeToString(Handle:plugin, numparams)
     SetNativeString(2, sTimeString, iMaxlen);
 }
 
+public N_SP_StringToTime(Handle:plugin, numparams)
+{
+    decl String:sTime[20];
+    GetNativeString(1, sTime, sizeof(sTime));
+    new client = GetNativeCell(2);
+    if(client >= 0)
+    {
+        if(!IsClientConnected(client))
+            client = -1;
+    }
+    if(StrEqual(sTime, "0"))
+        return 0;
+    new iTime = StringToInt(sTime);
+    if(iTime < 1)
+    {
+        if(client == 0)
+            ReplyToCommand(client, "%s%t", SP_PREFIX_NOCOLOR, "SP Time Invalid String");
+        else if(client > 0)
+            ReplyToCommand(client, "%s%t", SP_PREFIX, "SP Time Invalid String");
+        return -1;
+    }
+    return (iTime*60);
+}
+
 public N_SP_MenuTimes(Handle:plugin, numparams)
 {
-    // return a global handle for menu times
+// Do something to return menu times?
     return;
 }
 
 public N_SP_MenuReasons(Handle:plugin, numparams)
 {
-    // return a global handle for menu reasons
+// Do something to return menu reasons?
     return;
 }
 
@@ -260,7 +326,7 @@ public N_SP_DeRegPunishForward(Handle:plugin, numParams) {
     for(new i = 0; i<GetArraySize(g_hRegPunishTypes);i++)
     {
         GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
-        if(StrEqual(sArrayString, sType) && plugin == GetArrayCell(g_hRegPunishPlugins, i))
+        if(StrEqual(sArrayString, sType, false) && plugin == GetArrayCell(g_hRegPunishPlugins, i))
         {
             RemoveFromArray(g_hRegPunishPlugins, i);
             RemoveFromArray(g_hRegPunishTypes, i);
@@ -271,19 +337,58 @@ public N_SP_DeRegPunishForward(Handle:plugin, numParams) {
     return false;
 }
 
+public N_SP_RegMenuItem(Handle:plugin, numParams) {
+    decl String:sItemCommand[32], String:sTmpItemCommand[32], String:sItemName[32];
+    GetNativeString(1, sItemCommand, sizeof(sItemCommand));
+    GetNativeString(2, sItemName, sizeof(sItemName));
+    new Flag = GetNativeCell(3);
+    Flag = FlagToBit(Flag);
+    
+    for(new i = 0; i<GetArraySize(g_hRegMenuCommands);i++)
+    {
+        GetArrayString(g_hRegMenuCommands, i, sTmpItemCommand, sizeof(sTmpItemCommand));
+        if(StrEqual(sTmpItemCommand, sItemCommand, false) && plugin == GetArrayCell(g_hRegMenuPlugins, i))
+            return false;
+    }
+    PushArrayCell(g_hRegMenuPlugins, plugin);
+    PushArrayString(g_hRegMenuCommands, sItemCommand);
+    PushArrayString(g_hRegMenuItems, sItemName);
+    PushArrayCell(g_hRegMenuFlags, Flag);
+    return true;
+}
+
+public N_SP_DeRegMenuItem(Handle:plugin, numParams) {
+    decl String:sItemCommand[32], String:sTmpItemCommand[32];
+    GetNativeString(1, sItemCommand, sizeof(sItemCommand));
+    for(new i = 0; i<GetArraySize(g_hRegMenuCommands);i++)
+    {
+        GetArrayString(g_hRegMenuCommands, i, sTmpItemCommand, sizeof(sTmpItemCommand));
+        if(StrEqual(sTmpItemCommand, sItemCommand, false) && plugin == GetArrayCell(g_hRegMenuPlugins, i))
+        {
+            RemoveFromArray(g_hRegMenuPlugins, i);
+            RemoveFromArray(g_hRegMenuCommands, i);
+            RemoveFromArray(g_hRegMenuItems, i);
+            RemoveFromArray(g_hRegMenuFlags, i);
+            return true;
+        }
+    }
+    return false;
+}
+
 public N_SP_ClientHasAvtivePunishment(Handle:plugin, numParams)
 {
-    // need Auth, IP, PunishType, callback
-    // possibly allow this to check all connected clients for when the plugin is loaded mid-game?
+// need Auth, IP, PunishType, callback
+// possibly allow this to check all connected clients for when the plugin is loaded mid-game?
 }
 
 public OnClientAuthorized(client, const String:auth[])
 {
+// allow plugins to create a punishment time so we dont need to query for bans etc every time?
     decl String:sQuery[512], String:sSafeAuth[SP_MAXLEN_AUTH*2], String:sClientIP[SP_MAXLEN_IP], String:sSafeClientIP[SP_MAXLEN_IP*2];
     GetClientIP(client, sClientIP, sizeof(sClientIP));
     SQL_EscapeString(g_hSQL, sClientIP, sSafeClientIP, sizeof(sSafeClientIP));
     SQL_EscapeString(g_hSQL, auth, sSafeAuth, sizeof(sSafeAuth));
-    Format(sQuery, sizeof(sQuery), "SELECT Punish_Type, Punish_Time, Punish_Length, Punish_Auth_Type, Punish_Reason FROM %s%s WHERE ((Punish_Time + (Punish_Length*60)) > %d OR Punish_Length = 0) AND UnPunish = 0 AND IF(Punish_Auth_Type=0, Punish_Player_ID = '%s', Punish_Player_IP = '%s') AND IF(Punish_All_Servers=1, IF(Punish_All_Mods=0, Punish_Server_ID IN (SELECT ID FROM sp_servers WHERE Server_Mod = %d), 1), Punish_Server_ID=%d) ORDER BY FIELD(Punish_Length, 0), Punish_Time DESC, Punish_Length DESC", g_sDBPrefix, SP_DB_NAME, GetTime(), sSafeAuth, sSafeClientIP, g_iModID, g_iServerID);
+    Format(sQuery, sizeof(sQuery), "SELECT Punish_Type, Punish_Time, Punish_Length, Punish_Auth_Type, Punish_Reason FROM %s%s WHERE ((Punish_Time + (Punish_Length)) > %d OR Punish_Length = 0) AND UnPunish = 0 AND IF(Punish_Auth_Type=0, Punish_Player_ID = '%s', Punish_Player_IP = '%s') AND IF(Punish_All_Servers=1, IF(Punish_All_Mods=0, Punish_Server_ID IN (SELECT ID FROM sp_servers WHERE Server_Mod = %d), 1), Punish_Server_ID=%d) ORDER BY FIELD(Punish_Length, 0), Punish_Time DESC, Punish_Length DESC", g_sDBPrefix, SP_DB_NAME, GetTime(), sSafeAuth, sSafeClientIP, g_iModID, g_iServerID);
     SQL_TQuery(g_hSQL, Query_ClientAuthFetch, sQuery, GetClientUserId(client));
 }
 
@@ -313,7 +418,7 @@ public Query_ClientAuthFetch(Handle:owner, Handle:hndl, const String:error[], an
         for(new i = 0; i<GetArraySize(g_hRegPunishTypes);i++)
         {
             GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
-            if(StrEqual(sArrayString, sType))
+            if(StrEqual(sArrayString, sType, false))
             {
                 new Handle:f = CreateForward(ET_Ignore, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_String);
                 AddToForward(f, GetArrayCell(g_hRegPunishPlugins, i), Function:GetArrayCell(g_hRegPunishCallbacks, i));
@@ -332,24 +437,31 @@ public Query_ClientAuthFetch(Handle:owner, Handle:hndl, const String:error[], an
 
 public N_SP_DB_AddPunish(Handle:plugin, numparams)
 {
+// Add some kind of redundancy for if query fails?
+// Store queries, mark as active, failed or delete on callback, timer to re-try failed queries?
     decl String:sPunishType[SP_MAXLEN_TYPE], String:sPunishReason[SP_MAXLEN_REASON];
 
-    new PunishedUserID = GetNativeCell(1);
-    new PunisherUserID = GetNativeCell(2);
+    new Punished = GetNativeCell(1);
+// Add a setting to log bots?
+    if(IsFakeClient(Punished))
+        return;
+    new Punisher = GetNativeCell(2);
     new PunishLength = GetNativeCell(3);
     new PunishAuthType = GetNativeCell(4);
     GetNativeString(5, sPunishType, sizeof(sPunishType));
     GetNativeString(6, sPunishReason, sizeof(sPunishReason));
-
-    new Punished = GetClientOfUserId(PunishedUserID);
-    new Punisher = GetClientOfUserId(PunisherUserID);
 
     decl String:sPunishedName[MAX_TARGET_LENGTH], String:sPunishedAuth[SP_MAXLEN_AUTH], String:sPunishedIP[SP_MAXLEN_IP], String:sPunisherName[MAX_TARGET_LENGTH], String:sPunisherAuth[SP_MAXLEN_AUTH];
 
     GetClientName(Punished, sPunishedName, sizeof(sPunishedName));
     GetClientName(Punisher, sPunisherName, sizeof(sPunisherName));
     GetClientAuthString(Punished, sPunishedAuth, sizeof(sPunishedAuth));
-    GetClientAuthString(Punisher, sPunisherAuth, sizeof(sPunisherAuth));
+    if(Punisher == 0)
+    {
+        new iIp = GetConVarInt(FindConVar("hostip"));
+        Format(sPunisherAuth, sizeof(sPunisherAuth), "%i.%i.%i.%i:%d", (iIp >> 24) & 0x000000FF, (iIp >> 16) & 0x000000FF, (iIp >>  8) & 0x000000FF, iIp & 0x000000FF, GetConVarInt(FindConVar("hostport")));
+    } else
+        GetClientAuthString(Punisher, sPunisherAuth, sizeof(sPunisherAuth));
     GetClientIP(Punished, sPunishedIP, sizeof(sPunishedIP));
 
     decl String:sSPunishedName[MAX_TARGET_LENGTH*2], String:sSPunishedAuth[SP_MAXLEN_AUTH*2], String:sSPunishedIP[SP_MAXLEN_IP*2], String:sSPunisherName[MAX_TARGET_LENGTH*2], String:sSPunisherAuth[SP_MAXLEN_AUTH*2], String:sSPunishReason[SP_MAXLEN_REASON*2], String:sSPunishType[SP_MAXLEN_TYPE*2];
@@ -431,5 +543,41 @@ public Query_UnPunish(Handle:owner, Handle:hndl, const String:error[], any:data)
     {
         LogError("Database Error in Query_UnPunish: %s", error);
         return;
+    }
+}
+
+public Action:Command_SP(client, args)
+{ 
+    new AdminId:iAdmID = GetUserAdmin(client);
+    if(iAdmID == INVALID_ADMIN_ID)
+        return Plugin_Handled;
+    new iFlags = GetAdminFlags(iAdmID, Access_Effective);
+
+    new Handle:hMenu = CreateMenu(MenuHandler_SPAdmin);
+    SetMenuTitle(hMenu, "SP Admin Menu");
+
+// We need to sort the menu items with SortStrings
+    new Handle:hTempSort = CreateArray();
+    decl String:sTempCommand[32], String:sTempItem[32];
+    for(new i = 0; i<GetArraySize(g_hRegMenuCommands);i++)
+    {
+        if((iFlags & GetArrayCell(g_hRegMenuFlags, i)) || iFlags & ADMFLAG_ROOT)
+        {
+            GetArrayString(g_hRegMenuCommands, i, sTempCommand, sizeof(sTempCommand));
+            GetArrayString(g_hRegMenuItems, i, sTempItem, sizeof(sTempItem));
+            AddMenuItem(hMenu, sTempCommand, sTempItem);
+        }
+    }
+    DisplayMenu(hMenu, client, MENU_TIME_FOREVER);
+    return Plugin_Continue;
+}
+
+public MenuHandler_SPAdmin(Handle:menu, MenuAction:action, param1, param2)
+{
+	if(action == MenuAction_Select)
+	{
+        decl String:sMenuCommand[32];
+        GetMenuItem(menu, param2, sMenuCommand, sizeof(sMenuCommand));
+        FakeClientCommandEx(param1, sMenuCommand);
     }
 }

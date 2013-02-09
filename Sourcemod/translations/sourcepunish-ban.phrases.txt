@@ -1,8 +1,12 @@
 "Phrases"
 {
+	"SP Ban Queue"
+	{
+		"en"			"Player not bannable, already in ban queue."
+	}
 	"SP Ban Active"
 	{
-		"en"			"already has an active ban!"
+		"en"			"already has an active ban."
 	}
 	"SP Ban"
 	{

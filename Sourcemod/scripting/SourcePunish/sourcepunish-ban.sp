@@ -16,10 +16,9 @@ public OnPluginStart()
 {
     LoadTranslations("sourcepunish-ban.phrases");
     LoadTranslations("common.phrases");
-    
-    new bool:bPluginSourcePunish = LibraryExists("sourcepunish");
-    if(bPluginSourcePunish)
-        RegisterPluginTypes();
+
+    if(LibraryExists("sourcepunish"))
+        RegisterPlugin();
 
     RegAdminCmd("sm_ban", Command_Ban, ADMFLAG_BAN, "Ban ");
     //RegAdminCmd("sm_banip", Command_BanIP, ADMFLAG_BAN, "Ban ");
@@ -28,17 +27,19 @@ public OnPluginStart()
 
 public SP_Loaded()
 {
-    RegisterPluginTypes();
+    RegisterPlugin();
 }
 
-public RegisterPluginTypes()
+public RegisterPlugin()
 {
     SP_RegPunishForward("ban", Forward_Ban);
+    SP_RegMenuItem("sm_ban", "Ban", ADMFLAG_BAN);
 }
 
 public OnPluginEnd()
 {
     SP_DeRegPunishForward("ban");
+    SP_DeRegMenuItem("sm_ban");
 }
 
 public Action:Forward_Ban(userid, starttime, length, authtype, String:reason[])
@@ -51,7 +52,7 @@ public Action:Forward_Ban(userid, starttime, length, authtype, String:reason[])
             decl String:TimeString[SP_MAXLEN_TIME];
             new Time = 0;
             if(length > 0)
-                Time = (starttime + (length * 60)) -  GetTime();
+                Time = (starttime + (length)) -  GetTime();
             SP_TimeToString(Time, TimeString, sizeof(TimeString));
             if(StrEqual(reason, ""))
                 KickClient(client, "%t", "SP Ban Noname", TimeString);
@@ -65,24 +66,50 @@ public Action:Command_Ban(client, args)
 {
     if(args == 0)
     {
-        // We should show a ban menu here
-        
-    } else if(args < 2 || args > 3)
+        // should show a menu here
+        return Plugin_Handled;
+    }
+    if(args < 2)
     {
-		ReplyToCommand(client, "%sUsage: sm_ban <#userid|name> <time> [reason]", SP_PREFIX);
+		ReplyToCommand(client, "%sUsage: sm_ban <#userid|steamid|name> <time> [reason]", SP_PREFIX);
 		return Plugin_Handled;
-    } else {
-        decl String:sPlayer[MAX_TARGET_LENGTH], String:sLength[15], String:sReason[SP_MAXLEN_REASON];
-        GetCmdArg(1, sPlayer, sizeof(sPlayer));
-        GetCmdArg(2, sLength, sizeof(sLength));
-        GetCmdArg(3, sReason, sizeof(sReason));
-        
-        new target = FindTarget(0, sPlayer, true, false);
-        if(target == -1)
+    }
+    decl String:sPlayer[MAX_TARGET_LENGTH], String:sTime[10], String:sArgString[256];
+    GetCmdArgString(sArgString, sizeof(sArgString));
+    new iPos = BreakString(sArgString, sPlayer, sizeof(sPlayer));
+    iPos += BreakString(sArgString[iPos], sTime, sizeof(sTime));
+
+    new iTime = SP_StringToTime(sTime, client);
+    new target = SP_FindTarget(client, sPlayer, true);
+    if(target == -1 || iTime == -1)
+        return Plugin_Handled;
+    
+    decl String:TimeString[SP_MAXLEN_TIME];
+    SP_TimeToString(iTime, TimeString, sizeof(TimeString));
+    
+    decl String:sReason[SP_MAXLEN_REASON];
+    if(iPos < 0)
+        Format(sReason, sizeof(sReason), "");
+    else
+        Format(sReason, sizeof(sReason), sArgString[iPos]);
+
+
+    if(IsClientConnected(target) && !IsClientInKickQueue(target))
+    {
+        SP_DB_AddPunish(target, client, iTime, 0, "ban", sReason);
+        GetClientName(target, sPlayer, sizeof(sPlayer));
+        if(StrEqual(sReason, ""))
         {
-            //ReplyToCommand(client, "%s Player not found", SP_PREFIX);
-            return Plugin_Handled;
+            KickClient(target, "%t", "SP Ban Noname", TimeString);
+            LogAction(client, target, "%t", "SP Ban Noname", TimeString);
+            ShowActivity2(client, SP_PREFIX, "%t", "SP Ban", sPlayer, TimeString);
+        } else {
+            KickClient(target, "%t", "SP Ban Noname Reason", TimeString, sReason);
+            LogAction(client, target, "%t", "SP Ban Noname Reason", TimeString, sReason);
+            ShowActivity2(client, SP_PREFIX, "%t", "SP Ban Reason", sPlayer, TimeString, sReason);
         }
+    } else {
+        ReplyToCommand(client, "%s%t", SP_PREFIX, "SP Ban Queue");
     }
     return Plugin_Handled;
 }

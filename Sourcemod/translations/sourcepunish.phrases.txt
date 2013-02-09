@@ -32,8 +32,20 @@
 	{
 		"en"			"seconds"
 	}
+	"SP Time Invalid String"
+	{
+		"en"			"Invalid time provided."
+	}
 	"SP Bad Target"
 	{
 		"en"			"Player no long avilable or does not exist."
+	}
+	"SP Cannot Target"
+	{
+		"en"			"You do not have permission to target this player."
+	}
+	"SP Cannot Target Bot"
+	{
+		"en"			"You cannot target bots."
 	}
 }

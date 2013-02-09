@@ -17,15 +17,32 @@ public OnPluginStart()
     LoadTranslations("sourcepunish-kick.phrases");
     LoadTranslations("common.phrases");
 
-    RegAdminCmd("sm_kick", Command_Kick, ADMFLAG_KICK, "sm_kick <#userid|name> [reason]");
-    RegAdminCmd("sm_kicksteam", Command_KickSteam, ADMFLAG_KICK, "sm_kicksteam <steamid> [reason]");
+    if(LibraryExists("sourcepunish"))
+        RegisterPluginMenu();
+
+    RegAdminCmd("sm_kick", Command_Kick, ADMFLAG_KICK, "sm_kick <#userid|steamid|name> [reason]");
+}
+
+public SP_Loaded()
+{
+    RegisterPluginMenu();
+}
+
+public RegisterPluginMenu()
+{
+    SP_RegMenuItem("sm_kick", "Kick", ADMFLAG_KICK);
+}
+
+public OnPluginEnd()
+{
+    SP_DeRegMenuItem("sm_kick");
 }
 
 public Action:Command_Kick(client, args)
 {
     if(args == 0)
     {
-        // We should show a kick menu here
+        // should show a menu here
         return Plugin_Handled;
     }
 
@@ -33,66 +50,33 @@ public Action:Command_Kick(client, args)
     GetCmdArgString(sArgString, sizeof(sArgString));
     new iPos = BreakString(sArgString, sPlayer, sizeof(sPlayer));
 
-    new target = FindTarget(client, sPlayer, false);
+    new target = SP_FindTarget(client, sPlayer, true, false);
     if(target == -1)
         return Plugin_Handled;
+    
+    decl String:sReason[SP_MAXLEN_REASON];
+    if(iPos < 0)
+        Format(sReason, sizeof(sReason), "");
+    else
+        Format(sReason, sizeof(sReason), sArgString[iPos]);
+
 
     if(IsClientConnected(target) && !IsClientInKickQueue(target))
     {
-        if(!IsFakeClient(target))
-            SP_DB_AddPunish(GetClientUserId(target), GetClientUserId(client), -1, 0, "kick", sArgString[iPos]);
+        SP_DB_AddPunish(target, client, -1, 0, "kick", sReason);
         GetClientName(target, sPlayer, sizeof(sPlayer));
-        if(StrEqual(sArgString[iPos], ""))
+        if(StrEqual(sReason, ""))
         {
             KickClient(target, "%t", "SP Kick Noname");
+            LogAction(client, target, "%t", "SP Kick Noname");
             ShowActivity2(client, SP_PREFIX, "%t", "SP Kick", sPlayer);
         } else {
-            KickClient(target, "%t", "SP Kick Noname Reason", sArgString[iPos]);
-            ShowActivity2(client, SP_PREFIX, "%t", "SP Kick Reason", sPlayer, sArgString[iPos]);
+            KickClient(target, "%t", "SP Kick Noname Reason", sReason);
+            LogAction(client, target, "%t", "SP Kick Noname Reason", sReason);
+            ShowActivity2(client, SP_PREFIX, "%t", "SP Kick Reason", sPlayer, sReason);
         }
     } else {
         ReplyToCommand(client, "%s%t", SP_PREFIX, "SP Kick Queue");
     }
-    return Plugin_Handled;
-}
-
-
-public Action:Command_KickSteam(client, args)
-{
-    if(args == 0)
-    {
-        // We should show a kick menu here
-        return Plugin_Handled;
-    }
-
-    decl String:sPlayer[MAX_TARGET_LENGTH], String:sPlayerAuth[SP_MAXLEN_AUTH], String:sTempAuth[SP_MAXLEN_AUTH], String:sArgString[256];
-    GetCmdArgString(sArgString, sizeof(sArgString));
-    new iPos = BreakString(sArgString, sPlayerAuth, sizeof(sPlayerAuth));
-
-    for(new i = 1; i<= MAXPLAYERS; i++)
-    {
-        GetClientAuthString(i, sTempAuth, sizeof(sTempAuth));
-        if(StrEqual(sPlayerAuth, sTempAuth, false))
-        {
-            if(IsClientConnected(i) && !IsClientInKickQueue(i))
-            {
-                if(!IsFakeClient(i))
-                    SP_DB_AddPunish(GetClientUserId(i), GetClientUserId(client), -1, 0, "kick", sArgString[iPos]);
-                GetClientName(i, sPlayer, sizeof(sPlayer));
-                if(StrEqual(sArgString[iPos], ""))
-                {
-                    KickClient(i, "%t", "SP Kick Noname");
-                    ShowActivity2(client, SP_PREFIX, "%t", "SP Kick", sPlayer);
-                } else {
-                    KickClient(i, "%t", "SP Kick Noname Reason", sArgString[iPos]);
-                    ShowActivity2(client, SP_PREFIX, "%t", "SP Kick Reason", sPlayer, sArgString[iPos]);
-                }
-                return Plugin_Handled;
-            } else {
-                ReplyToCommand(client, "%s%t", SP_PREFIX, "SP Kick Queue");
-            }
-        }
-    }
-    ReplyToCommand(client, "%s%t", SP_PREFIX, "SP Kick Steam");
     return Plugin_Handled;
 }

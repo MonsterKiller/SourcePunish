@@ -2,11 +2,7 @@
 {
 	"SP Kick Queue"
 	{
-		"en"			"Player not kickable, already in kick queue"
-	}
-	"SP Kick Steam"
-	{
-		"en"			"Cannot find player to kick by that SteamID"
+		"en"			"Player not kickable, already in kick queue."
 	}
 	"SP Kick"
 	{
