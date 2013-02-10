@@ -1,5 +1,6 @@
-#define SP_PLUGIN_VERSION "0.0.04"
+#define SP_PLUGIN_VERSION "0.0.05"
 #define SP_PLUGIN_URL "http://sourcepunish.net"
+#define SP_PLUGIN_AUTHOR "Monster Killer"
 #define SP_PREFIX "\x01[\x07FE4444SP\x01] "
 #define SP_PREFIX_NOCOLOR "[SP] "
 #define SP_DB_NAME "punish"
@@ -29,6 +30,7 @@ public __pl_sourcepunish_SetNTVOptional()
 	MarkNativeAsOptional("SP_DeRegPunishForward");
 	MarkNativeAsOptional("SP_RegMenuItem");
 	MarkNativeAsOptional("SP_TimeToString");
+	MarkNativeAsOptional("SP_StringToTime");
 	MarkNativeAsOptional("SP_DB_AddPunish");
 	MarkNativeAsOptional("SP_DB_UnPunish");
 }

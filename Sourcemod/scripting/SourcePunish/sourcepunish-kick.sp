@@ -6,7 +6,7 @@
 public Plugin:myinfo = 
 {
     name = "SourcePunish -> Kick",
-    author = "Monster Killer",
+    author = SP_PLUGIN_AUTHOR,
     description = "SourcePunish kick module",
     version = SP_PLUGIN_VERSION,
     url = SP_PLUGIN_URL
@@ -45,7 +45,6 @@ public Action:Command_Kick(client, args)
         // should show a menu here
         return Plugin_Handled;
     }
-
     decl String:sPlayer[MAX_TARGET_LENGTH], String:sArgString[256];
     GetCmdArgString(sArgString, sizeof(sArgString));
     new iPos = BreakString(sArgString, sPlayer, sizeof(sPlayer));

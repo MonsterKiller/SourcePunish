@@ -6,7 +6,7 @@
 public Plugin:myinfo = 
 {
     name = "SourcePunish -> Ban",
-    author = "Monster Killer",
+    author = SP_PLUGIN_AUTHOR,
     description = "SourcePunish ban module",
     version = SP_PLUGIN_VERSION,
     url = SP_PLUGIN_URL

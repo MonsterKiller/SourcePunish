@@ -5,14 +5,22 @@
 #include <sdktools>
 #include <regex>
 
-new Handle:g_hRegPunishPlugins;
-new Handle:g_hRegPunishTypes;
-new Handle:g_hRegPunishCallbacks;
+new Handle:g_hRegPunish;
+enum eRegPunish
+{
+    String:Types[32],
+    Handle:Callbacks,
+    Handle:Plugins
+};
 
-new Handle:g_hRegMenuPlugins;
-new Handle:g_hRegMenuItems;
-new Handle:g_hRegMenuCommands;
-new Handle:g_hRegMenuFlags;
+new Handle:g_hSPMenu;
+enum eSPMenu
+{
+    String:Items[32],
+    String:Commands[32],
+    Flags,
+    Handle:Plugins
+};
 
 new Handle:g_hKV;
 new Handle:g_hSQL = INVALID_HANDLE;
@@ -23,12 +31,12 @@ new g_iServerID;
 new g_iModID;
 new g_bPunishAllServers;
 new g_bPunishAllMods;
-new String:g_sDBPrefix[10];
+new String:g_sDBPrefix[30];
 
 public Plugin:myinfo = 
 {
     name = "SourcePunish -> Core",
-    author = "Monster Killer",
+    author = SP_PLUGIN_AUTHOR,
     description = "Punishment tool",
     version = SP_PLUGIN_VERSION,
     url = SP_PLUGIN_URL
@@ -40,14 +48,9 @@ public OnPluginStart()
     CreateConVar("sourcepunish_version", SP_PLUGIN_VERSION, "Current version of SourcePunish", FCVAR_PLUGIN|FCVAR_REPLICATED|FCVAR_SPONLY|FCVAR_NOTIFY);
 
     SP_LoadConfig();
-    
-    g_hRegPunishPlugins = CreateArray();
-    g_hRegPunishTypes = CreateArray(SP_MAXLEN_TYPE);
-    g_hRegPunishCallbacks = CreateArray();
-    g_hRegMenuPlugins = CreateArray();
-    g_hRegMenuCommands = CreateArray();
-    g_hRegMenuItems = CreateArray(SP_MAXLEN_TYPE);
-    g_hRegMenuFlags = CreateArray();
+
+    g_hRegPunish = CreateArray(_:eRegPunish);
+    g_hSPMenu = CreateArray(_:eSPMenu);
 
     RegAdminCmd("sm_sp", Command_SP, ADMFLAG_GENERIC, "sp");
 }
@@ -62,15 +65,11 @@ public OnAllPluginsLoaded()
 
 public OnPluginEnd()
 {
-    ClearArray(g_hRegPunishPlugins);
-    ClearArray(g_hRegPunishTypes);
-    ClearArray(g_hRegPunishCallbacks);
-    ClearArray(g_hRegMenuPlugins);
-    ClearArray(g_hRegMenuCommands);
-    ClearArray(g_hRegMenuItems);
-    ClearArray(g_hRegMenuFlags);
+    ClearArray(g_hSPMenu);
+    ClearArray(g_hRegPunish);
     CloseHandle(g_hSQL);
     CloseHandle(g_hKV);
+    CloseHandle(g_hrSteamID);
 }
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
@@ -274,7 +273,7 @@ public N_SP_StringToTime(Handle:plugin, numparams)
     decl String:sTime[20];
     GetNativeString(1, sTime, sizeof(sTime));
     new client = GetNativeCell(2);
-    if(client >= 0)
+    if(client > 0)
     {
         if(!IsClientConnected(client))
             client = -1;
@@ -306,31 +305,30 @@ public N_SP_MenuReasons(Handle:plugin, numparams)
 }
 
 public N_SP_RegPunishForward(Handle:plugin, numParams) {
-    decl String:sType[SP_MAXLEN_TYPE], String:sArrayString[SP_MAXLEN_TYPE];
+    decl PunishHolder[eRegPunish], String:sType[SP_MAXLEN_TYPE];
     GetNativeString(1, sType, sizeof(sType));
-    for(new i = 0; i<GetArraySize(g_hRegPunishPlugins);i++)
+    for(new i = 0; i < GetArraySize(g_hRegPunish); i++)
     {
-        GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
-        if(StrEqual(sArrayString, sType) && plugin == GetArrayCell(g_hRegPunishPlugins, i))
+        GetArrayArray(g_hRegPunish, i, PunishHolder[0]);
+        if(StrEqual(PunishHolder[Types], sType, false) && plugin == PunishHolder[Plugins])
             return false;
     }
-    PushArrayCell(g_hRegPunishPlugins, plugin);
-    PushArrayString(g_hRegPunishTypes, sType);
-    PushArrayCell(g_hRegPunishCallbacks, GetNativeCell(2));
+    Format(PunishHolder[Types], sizeof(PunishHolder[Types]), sType);
+    PunishHolder[Callbacks] = GetNativeCell(2);
+    PunishHolder[Plugins] = plugin;
+    PushArrayArray(g_hRegPunish, PunishHolder[0]);
     return true;
 }
 
 public N_SP_DeRegPunishForward(Handle:plugin, numParams) {
-    decl String:sType[SP_MAXLEN_TYPE], String:sArrayString[SP_MAXLEN_TYPE];
+    decl PunishHolder[eRegPunish], String:sType[SP_MAXLEN_TYPE];
     GetNativeString(1, sType, sizeof(sType));
-    for(new i = 0; i<GetArraySize(g_hRegPunishTypes);i++)
+    for(new i = 0; i < GetArraySize(g_hRegPunish); i++)
     {
-        GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
-        if(StrEqual(sArrayString, sType, false) && plugin == GetArrayCell(g_hRegPunishPlugins, i))
+        GetArrayArray(g_hRegPunish, i, PunishHolder[0]);
+        if(StrEqual(PunishHolder[Types], sType, false) && plugin == PunishHolder[Plugins])
         {
-            RemoveFromArray(g_hRegPunishPlugins, i);
-            RemoveFromArray(g_hRegPunishTypes, i);
-            RemoveFromArray(g_hRegPunishCallbacks, i);
+            RemoveFromArray(g_hRegPunish, i);
             return true;
         }
     }
@@ -338,37 +336,32 @@ public N_SP_DeRegPunishForward(Handle:plugin, numParams) {
 }
 
 public N_SP_RegMenuItem(Handle:plugin, numParams) {
-    decl String:sItemCommand[32], String:sTmpItemCommand[32], String:sItemName[32];
+    decl MenuHolder[eSPMenu], String:sItemCommand[32];
     GetNativeString(1, sItemCommand, sizeof(sItemCommand));
-    GetNativeString(2, sItemName, sizeof(sItemName));
-    new Flag = GetNativeCell(3);
-    Flag = FlagToBit(Flag);
-    
-    for(new i = 0; i<GetArraySize(g_hRegMenuCommands);i++)
+    for(new i = 0; i < GetArraySize(g_hSPMenu); i++)
     {
-        GetArrayString(g_hRegMenuCommands, i, sTmpItemCommand, sizeof(sTmpItemCommand));
-        if(StrEqual(sTmpItemCommand, sItemCommand, false) && plugin == GetArrayCell(g_hRegMenuPlugins, i))
+        GetArrayArray(g_hSPMenu, i, MenuHolder[0]);
+        if(StrEqual(MenuHolder[Commands], sItemCommand, false) && plugin == MenuHolder[Plugins])
             return false;
     }
-    PushArrayCell(g_hRegMenuPlugins, plugin);
-    PushArrayString(g_hRegMenuCommands, sItemCommand);
-    PushArrayString(g_hRegMenuItems, sItemName);
-    PushArrayCell(g_hRegMenuFlags, Flag);
+    Format(MenuHolder[Commands], sizeof(MenuHolder[Commands]), sItemCommand);
+    GetNativeString(2, MenuHolder[Items], sizeof(MenuHolder[Items]));
+    MenuHolder[Flags] = GetNativeCell(3);
+    MenuHolder[Plugins] = plugin;
+    PushArrayArray(g_hSPMenu, MenuHolder[0]);
+    SortADTArray(g_hSPMenu, Sort_Ascending, Sort_String);
     return true;
 }
 
 public N_SP_DeRegMenuItem(Handle:plugin, numParams) {
-    decl String:sItemCommand[32], String:sTmpItemCommand[32];
+    decl MenuHolder[eSPMenu], String:sItemCommand[32];
     GetNativeString(1, sItemCommand, sizeof(sItemCommand));
-    for(new i = 0; i<GetArraySize(g_hRegMenuCommands);i++)
+    for(new i = 0; i < GetArraySize(g_hSPMenu); i++)
     {
-        GetArrayString(g_hRegMenuCommands, i, sTmpItemCommand, sizeof(sTmpItemCommand));
-        if(StrEqual(sTmpItemCommand, sItemCommand, false) && plugin == GetArrayCell(g_hRegMenuPlugins, i))
+        GetArrayArray(g_hSPMenu, i, MenuHolder[0]);
+        if(StrEqual(MenuHolder[Commands], sItemCommand, false) && plugin == MenuHolder[Plugins])
         {
-            RemoveFromArray(g_hRegMenuPlugins, i);
-            RemoveFromArray(g_hRegMenuCommands, i);
-            RemoveFromArray(g_hRegMenuItems, i);
-            RemoveFromArray(g_hRegMenuFlags, i);
+            RemoveFromArray(g_hSPMenu, i);
             return true;
         }
     }
@@ -414,14 +407,14 @@ public Query_ClientAuthFetch(Handle:owner, Handle:hndl, const String:error[], an
         iLength = SQL_FetchInt(hndl, 2);
         iAuthType = SQL_FetchInt(hndl, 3);
         SQL_FetchString(hndl, 4, sReason, sizeof(sReason));
-        decl String:sArrayString[SP_MAXLEN_TYPE];
-        for(new i = 0; i<GetArraySize(g_hRegPunishTypes);i++)
+        decl PunishHolder[eRegPunish];
+        for(new i = 0; i < GetArraySize(g_hRegPunish); i++)
         {
-            GetArrayString(g_hRegPunishTypes, i, sArrayString, sizeof(sArrayString));
-            if(StrEqual(sArrayString, sType, false))
+            GetArrayArray(g_hRegPunish, i, PunishHolder[0]);
+            if(StrEqual(PunishHolder[Types], sType, false))
             {
                 new Handle:f = CreateForward(ET_Ignore, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_String);
-                AddToForward(f, GetArrayCell(g_hRegPunishPlugins, i), Function:GetArrayCell(g_hRegPunishCallbacks, i));
+                AddToForward(f, PunishHolder[Plugins], Function:PunishHolder[Callbacks]);
                 Call_StartForward(f);
                 Call_PushCell(userid);
                 Call_PushCell(iStartTime);
@@ -528,9 +521,8 @@ public N_SP_DB_UnPunish(Handle:plugin, numparams)
     {
         iSUnPunishAuthType = 1;
         Format(sAuthQuery, sizeof(sAuthQuery), "Punish_Player_IP='%s'", sPunishedIP);
-    } else {
+    } else
         Format(sAuthQuery, sizeof(sAuthQuery), "Punish_Player_ID='%s'", sSPunishedAuth);
-    }
     
     decl String:sQuery[512];
     Format(sQuery, sizeof(sQuery), "UPDATE %s%s SET UnPunish=1, UnPunish_Admin_name='%s', UnPunish_Admin_ID='%s', UnPunish_Time=%d, UnPunish_Reason='%s' WHERE Punish_Type='%s' AND ((Punish_Time + (Punish_Length*60)) > %d OR Punish_Length = 0) AND UnPunish = 0 AND Punish_Auth_Type=%d AND %s AND IF(Punish_All_Servers=1, IF(Punish_All_Mods=0, Punish_Server_ID IN (SELECT ID FROM sp_servers WHERE Server_Mod = %d), 1), Punish_Server_ID=%d)", g_sDBPrefix, SP_DB_NAME, sSUnPunisherName, sSUnPunisherAuth, GetTime(), sSUnPunishReason, sUnPunishType, GetTime(), iSUnPunishAuthType, sAuthQuery, g_iModID, g_iServerID);
@@ -557,17 +549,16 @@ public Action:Command_SP(client, args)
     SetMenuTitle(hMenu, "SP Admin Menu");
 
 // We need to sort the menu items with SortStrings
-    new Handle:hTempSort = CreateArray();
-    decl String:sTempCommand[32], String:sTempItem[32];
-    for(new i = 0; i<GetArraySize(g_hRegMenuCommands);i++)
+    decl MenuHolder[eSPMenu];
+    for(new i = 0; i < GetArraySize(g_hSPMenu); i++)
     {
-        if((iFlags & GetArrayCell(g_hRegMenuFlags, i)) || iFlags & ADMFLAG_ROOT)
+        GetArrayArray(g_hSPMenu, i, MenuHolder[0]);
+        if(iFlags & MenuHolder[Flags] || iFlags & ADMFLAG_ROOT)
         {
-            GetArrayString(g_hRegMenuCommands, i, sTempCommand, sizeof(sTempCommand));
-            GetArrayString(g_hRegMenuItems, i, sTempItem, sizeof(sTempItem));
-            AddMenuItem(hMenu, sTempCommand, sTempItem);
+            AddMenuItem(hMenu, MenuHolder[Commands], MenuHolder[Items]);
         }
     }
+
     DisplayMenu(hMenu, client, MENU_TIME_FOREVER);
     return Plugin_Continue;
 }
