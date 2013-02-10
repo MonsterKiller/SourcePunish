@@ -40,6 +40,10 @@
 	{
 		"en"			"Player no long avilable or does not exist."
 	}
+	"SP Multi Target"
+	{
+		"en"			"It seems a player is using another player's SteamID as their name, please use their #userid instead!"
+	}
 	"SP Cannot Target"
 	{
 		"en"			"You do not have permission to target this player."
@@ -47,5 +51,17 @@
 	"SP Cannot Target Bot"
 	{
 		"en"			"You cannot target bots."
+	}
+	"SP Menu No Reasons"
+	{
+		"en"			"There are no reasons set in the config file?"
+	}
+	"SP Menu No Times"
+	{
+		"en"			"There are no times set in the config file?"
+	}
+	"SP Player Not Available"
+	{
+		"en"			"The selected player is not longer available!"
 	}
 }

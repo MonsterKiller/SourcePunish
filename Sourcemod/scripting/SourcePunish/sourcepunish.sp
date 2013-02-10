@@ -26,6 +26,7 @@ new Handle:g_hKV;
 new Handle:g_hSQL = INVALID_HANDLE;
 
 new Handle:g_hrSteamID;
+new Handle:g_hrIP;
 
 new g_iServerID;
 new g_iModID;
@@ -70,19 +71,26 @@ public OnPluginEnd()
     CloseHandle(g_hSQL);
     CloseHandle(g_hKV);
     CloseHandle(g_hrSteamID);
+    CloseHandle(g_hrIP);
 }
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 {
+    CreateNative("SP_Reply", N_SP_Reply);
     CreateNative("SP_FindTarget", N_SP_FindTarget);
     CreateNative("SP_TimeToString", N_SP_TimeToString);
     CreateNative("SP_StringToTime", N_SP_StringToTime);
+    CreateNative("SP_IsValidSteamId", N_SP_IsValidSteamId);
+    CreateNative("SP_IsValidIp", N_SP_IsValidIP);
     CreateNative("SP_RegPunishForward", N_SP_RegPunishForward);
     CreateNative("SP_DeRegPunishForward", N_SP_DeRegPunishForward);
     CreateNative("SP_RegMenuItem", N_SP_RegMenuItem);
     CreateNative("SP_DeRegMenuItem", N_SP_DeRegMenuItem);
     CreateNative("SP_DB_AddPunish", N_SP_DB_AddPunish);
     CreateNative("SP_DB_UnPunish", N_SP_DB_AddPunish);
+    CreateNative("SP_Menu_Players", N_SP_Menu_Players);
+    CreateNative("SP_Menu_Times", N_SP_Menu_Times);
+    CreateNative("SP_Menu_Reasons", N_SP_Menu_Reasons);
     RegPluginLibrary("sourcepunish");
     return APLRes_Success;
 }
@@ -108,9 +116,8 @@ SP_LoadConfig()
     if(g_bPunishAllMods != 0) g_bPunishAllMods = 1;
     KvGetString(g_hKV, "DBPrefix", g_sDBPrefix, sizeof(g_sDBPrefix));
     
-    // We should also load a list of punishment times & reasons to create a menu hadle to use with a native
-    
     g_hrSteamID = CompileRegex("STEAM_[0-7]:[01]:[0-9]{7,10}", PCRE_CASELESS); //future proofed
+    g_hrIP = CompileRegex("(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}");
 
     SP_LoadDB();
 }
@@ -155,6 +162,20 @@ public Query_LoadConf(Handle:owner, Handle:hndl, const String:error[], any:data)
     g_iModID = SQL_FetchInt(hndl, 0);
 }
 
+public N_SP_Reply(Handle:plugin, numparams)
+{
+    decl String:sTextBuffer[512], iWritten;
+    new client = GetNativeCell(1);
+    GetNativeString(2, sTextBuffer, sizeof(sTextBuffer));
+    FormatNativeString(0, 2, 3, sizeof(sTextBuffer), iWritten, sTextBuffer);
+    if(client == 0)
+        ReplyToCommand(client, "%s%s", SP_PREFIX_NOCOLOR, sTextBuffer);
+    else if(client > 0) {
+        if(!IsFakeClient(client) && IsClientConnected(client))
+            ReplyToCommand(client, "%s%s", SP_PREFIX, sTextBuffer);
+    }
+}
+
 public N_SP_FindTarget(Handle:plugin, numparams)
 {
     decl String:sTarget[MAX_TARGET_LENGTH], String:sTargetString[MAX_TARGET_LENGTH];
@@ -168,35 +189,13 @@ public N_SP_FindTarget(Handle:plugin, numparams)
     flags |= COMMAND_FILTER_NO_IMMUNITY;
 
     decl TargetList[1], bool:tn_is_ml;
+    
+    new iTargetMatchs = 0;
+    new iTargetMatch = -1;
 
-    if(ProcessTargetString(sTarget, iTriggerClient, TargetList, 1, flags, sTargetString, sizeof(sTargetString), tn_is_ml) > 0)
+    if(bSteamID)
     {
-        if(bImmunity)
-        {
-            if(!(CanUserTarget(iTriggerClient, TargetList[0])))
-            {
-                if(iTriggerClient == 0)
-                    ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX_NOCOLOR, "SP Cannot Target");
-                else if(iTriggerClient > 0)
-                    ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX, "SP Cannot Target");
-                return -1;
-            }
-        }
-        if(bNoBots)
-        {
-            if(IsFakeClient(TargetList[0]))
-            {
-                if(iTriggerClient == 0)
-                    ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX_NOCOLOR, "SP Cannot Target Bot");
-                else if(iTriggerClient > 0)
-                    ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX, "SP Cannot Target Bot");
-                return -1;
-            }
-        }
-        return TargetList[0];
-    }
-    if(bSteamID) {
-        if(MatchRegex(g_hrSteamID, sTarget))
+        if(SP_IsValidSteamId(sTarget))
         {
             decl String:sTempAuth[SP_MAXLEN_AUTH];
             for(new i = 1; i<= MaxClients; i++)
@@ -206,22 +205,51 @@ public N_SP_FindTarget(Handle:plugin, numparams)
                 GetClientAuthString(i, sTempAuth, sizeof(sTempAuth));
                 if(StrEqual(sTarget, sTempAuth, false))
                 {
-                    if(CanUserTarget(iTriggerClient, i))
-                        return i;
-                    else {
-                        if(iTriggerClient == 0)
-                            ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX_NOCOLOR, "SP Cannot Target");
-                        else if(iTriggerClient > 0)
-                            ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX, "SP Cannot Target");
+                    if(bImmunity)
+                    {
+                        if(CanUserTarget(iTriggerClient, i))
+                        {
+                            iTargetMatchs+=1;
+                            iTargetMatch = i;
+                        } else {
+                            SP_Reply(iTriggerClient, "%t", "SP Cannot Target");
+                            return -1;
+                        }
+                    } else {
+                        iTargetMatchs+=1;
+                        iTargetMatch = i;
                     }
                 }
             }
         }
     }
-    if(iTriggerClient == 0)
-        ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX_NOCOLOR, "SP Bad Target");
-    else if(iTriggerClient > 0)
-        ReplyToCommand(iTriggerClient, "%s%t", SP_PREFIX, "SP Bad Target");
+    if(ProcessTargetString(sTarget, iTriggerClient, TargetList, 1, flags, sTargetString, sizeof(sTargetString), tn_is_ml) > 0)
+    {
+        if(bImmunity)
+        {
+            if(!CanUserTarget(iTriggerClient, TargetList[0]))
+            {
+                SP_Reply(iTriggerClient, "%t", "SP Cannot Target");
+                return -1;
+            }
+        }
+        if(bNoBots)
+        {
+            if(IsFakeClient(TargetList[0]))
+            {
+                SP_Reply(iTriggerClient, "%t", SP_PREFIX_NOCOLOR, "SP Cannot Target Bot");
+                return -1;
+            }
+        }
+        iTargetMatchs+=1;
+        iTargetMatch = TargetList[0];
+    }
+    if(iTargetMatchs == 1)
+        return iTargetMatch;
+    if(iTargetMatchs > 1)
+        SP_Reply(iTriggerClient, "%t", "SP Multi Target");
+    else
+        SP_Reply(iTriggerClient, "%t", "SP Bad Target");
     return -1;
 }
 
@@ -283,25 +311,110 @@ public N_SP_StringToTime(Handle:plugin, numparams)
     new iTime = StringToInt(sTime);
     if(iTime < 1)
     {
-        if(client == 0)
-            ReplyToCommand(client, "%s%t", SP_PREFIX_NOCOLOR, "SP Time Invalid String");
-        else if(client > 0)
-            ReplyToCommand(client, "%s%t", SP_PREFIX, "SP Time Invalid String");
+        if(client >= 0)
+            SP_Reply(client, "%t", "SP Time Invalid String");
         return -1;
     }
     return (iTime*60);
 }
 
-public N_SP_MenuTimes(Handle:plugin, numparams)
+public N_SP_IsValidSteamId(Handle:plugin, numparams)
 {
-// Do something to return menu times?
-    return;
+    decl String:sSteamID[SP_MAXLEN_AUTH];
+    GetNativeString(1, sSteamID, sizeof(sSteamID));
+    new iRegex = MatchRegex(g_hrSteamID, sSteamID);
+    if(iRegex >= 0)
+        return true;
+    else
+        return false;
 }
 
-public N_SP_MenuReasons(Handle:plugin, numparams)
+public N_SP_IsValidIP(Handle:plugin, numparams)
 {
-// Do something to return menu reasons?
-    return;
+    decl String:sIP[SP_MAXLEN_IP];
+    GetNativeString(1, sIP, sizeof(sIP));
+    new iRegex = MatchRegex(g_hrIP, sIP);
+    if(iRegex > 0)
+        return true;
+    else
+        return false;
+}
+
+public N_SP_Menu_Times(Handle:plugin, numparams)
+{
+    new Handle:hTmpMenuHandle = GetNativeCell(1);
+    if(hTmpMenuHandle == INVALID_HANDLE)
+        return _:hTmpMenuHandle;
+
+    KvRewind(g_hKV);
+    if(!KvJumpToKey(g_hKV, "MenuTimes") || !KvGotoFirstSubKey(g_hKV, false)) {
+        LogError("%t", "SP Menu No Times");
+        return _:hTmpMenuHandle;
+    }
+
+    decl String:key[20], String:value[20];
+    do
+    {
+        KvGetSectionName(g_hKV, key, sizeof(key));
+        KvGetString(g_hKV, NULL_STRING, value, sizeof(value));
+        AddMenuItem(hTmpMenuHandle, value, key);
+    } while (KvGotoNextKey(g_hKV, false));
+    KvRewind(g_hKV);
+
+    return _:hTmpMenuHandle;
+}
+
+public N_SP_Menu_Reasons(Handle:plugin, numparams)
+{
+    new Handle:hTmpMenuHandle = GetNativeCell(1);
+    if(hTmpMenuHandle == INVALID_HANDLE)
+        return _:hTmpMenuHandle;
+
+    KvRewind(g_hKV);
+    if(!KvJumpToKey(g_hKV, "MenuReasons") || !KvGotoFirstSubKey(g_hKV, false)) {
+        LogError("%t", "SP Menu No Reasons");
+        return _:hTmpMenuHandle;
+    }
+
+    decl String:key[40], String:value[40];
+    do
+    {
+        KvGetSectionName(g_hKV, key, sizeof(key));
+        KvGetString(g_hKV, NULL_STRING, value, sizeof(value));
+        AddMenuItem(hTmpMenuHandle, value, key);
+    } while (KvGotoNextKey(g_hKV, false));
+    KvRewind(g_hKV);
+
+    return _:hTmpMenuHandle;
+}
+public N_SP_Menu_Players(Handle:plugin, numparams)
+{
+    decl String:sTmpName[MAX_TARGET_LENGTH], String:sTmpID[3];
+    new Handle:hTmpMenuHandle = GetNativeCell(1);
+    if(hTmpMenuHandle == INVALID_HANDLE)
+        return _:hTmpMenuHandle;
+    new client = GetNativeCell(2);
+    new bool:bNoBots = GetNativeCell(3);
+    new bool:bImmunity = GetNativeCell(4);
+    for(new i = 1; i<= MaxClients; i++)
+    {
+        if(!IsClientInGame(i))
+            continue;
+        if(bNoBots)
+        {
+            if(IsFakeClient(i))
+                continue;
+        }
+        if(bImmunity)
+        {
+            if(!CanUserTarget(client, i))
+                continue;
+        }
+        GetClientName(i, sTmpName, sizeof(sTmpName));
+        IntToString(GetClientUserId(i), sTmpID, sizeof(sTmpID));
+        AddMenuItem(hTmpMenuHandle, sTmpID, sTmpName);
+    }
+    return _:hTmpMenuHandle;
 }
 
 public N_SP_RegPunishForward(Handle:plugin, numParams) {
@@ -377,12 +490,15 @@ public N_SP_ClientHasAvtivePunishment(Handle:plugin, numParams)
 public OnClientAuthorized(client, const String:auth[])
 {
 // allow plugins to create a punishment time so we dont need to query for bans etc every time?
-    decl String:sQuery[512], String:sSafeAuth[SP_MAXLEN_AUTH*2], String:sClientIP[SP_MAXLEN_IP], String:sSafeClientIP[SP_MAXLEN_IP*2];
-    GetClientIP(client, sClientIP, sizeof(sClientIP));
-    SQL_EscapeString(g_hSQL, sClientIP, sSafeClientIP, sizeof(sSafeClientIP));
-    SQL_EscapeString(g_hSQL, auth, sSafeAuth, sizeof(sSafeAuth));
-    Format(sQuery, sizeof(sQuery), "SELECT Punish_Type, Punish_Time, Punish_Length, Punish_Auth_Type, Punish_Reason FROM %s%s WHERE ((Punish_Time + (Punish_Length)) > %d OR Punish_Length = 0) AND UnPunish = 0 AND IF(Punish_Auth_Type=0, Punish_Player_ID = '%s', Punish_Player_IP = '%s') AND IF(Punish_All_Servers=1, IF(Punish_All_Mods=0, Punish_Server_ID IN (SELECT ID FROM sp_servers WHERE Server_Mod = %d), 1), Punish_Server_ID=%d) ORDER BY FIELD(Punish_Length, 0), Punish_Time DESC, Punish_Length DESC", g_sDBPrefix, SP_DB_NAME, GetTime(), sSafeAuth, sSafeClientIP, g_iModID, g_iServerID);
-    SQL_TQuery(g_hSQL, Query_ClientAuthFetch, sQuery, GetClientUserId(client));
+    if(!StrEqual(auth, "BOT", false) && !IsFakeClient(client))
+    {
+        decl String:sQuery[512], String:sSafeAuth[SP_MAXLEN_AUTH*2], String:sClientIP[SP_MAXLEN_IP], String:sSafeClientIP[SP_MAXLEN_IP*2];
+        GetClientIP(client, sClientIP, sizeof(sClientIP));
+        SQL_EscapeString(g_hSQL, sClientIP, sSafeClientIP, sizeof(sSafeClientIP));
+        SQL_EscapeString(g_hSQL, auth, sSafeAuth, sizeof(sSafeAuth));
+        Format(sQuery, sizeof(sQuery), "SELECT Punish_Type, Punish_Time, Punish_Length, Punish_Auth_Type, Punish_Reason FROM %s%s WHERE ((Punish_Time + (Punish_Length)) > %d OR Punish_Length = 0) AND UnPunish = 0 AND IF(Punish_Auth_Type=0, Punish_Player_ID = '%s', Punish_Player_IP = '%s') AND IF(Punish_All_Servers=1, IF(Punish_All_Mods=0, Punish_Server_ID IN (SELECT ID FROM sp_servers WHERE Server_Mod = %d), 1), Punish_Server_ID=%d) ORDER BY FIELD(Punish_Length, 0), Punish_Time DESC, Punish_Length DESC", g_sDBPrefix, SP_DB_NAME, GetTime(), sSafeAuth, sSafeClientIP, g_iModID, g_iServerID);
+        SQL_TQuery(g_hSQL, Query_ClientAuthFetch, sQuery, GetClientUserId(client));
+    }
 }
 
 public Query_ClientAuthFetch(Handle:owner, Handle:hndl, const String:error[], any:userid)
@@ -547,8 +663,6 @@ public Action:Command_SP(client, args)
 
     new Handle:hMenu = CreateMenu(MenuHandler_SPAdmin);
     SetMenuTitle(hMenu, "SP Admin Menu");
-
-// We need to sort the menu items with SortStrings
     decl MenuHolder[eSPMenu];
     for(new i = 0; i < GetArraySize(g_hSPMenu); i++)
     {
@@ -558,7 +672,6 @@ public Action:Command_SP(client, args)
             AddMenuItem(hMenu, MenuHolder[Commands], MenuHolder[Items]);
         }
     }
-
     DisplayMenu(hMenu, client, MENU_TIME_FOREVER);
     return Plugin_Continue;
 }

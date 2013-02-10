@@ -14,36 +14,53 @@
 
 public SharedPlugin:__pl_sourcepunish = 
 {
-	name = "sourcepunish",
-	file = "sourcepunish.smx",
+    name = "sourcepunish",
+    file = "sourcepunish.smx",
 #if defined REQUIRE_PLUGIN
-	required = 1,
+    required = 1,
 #else
-	required = 0,
+    required = 0,
 #endif
 };
  
 public __pl_sourcepunish_SetNTVOptional()
 {
-	MarkNativeAsOptional("SP_FindTarget");
-	MarkNativeAsOptional("SP_RegPunishForward");
-	MarkNativeAsOptional("SP_DeRegPunishForward");
-	MarkNativeAsOptional("SP_RegMenuItem");
-	MarkNativeAsOptional("SP_TimeToString");
-	MarkNativeAsOptional("SP_StringToTime");
-	MarkNativeAsOptional("SP_DB_AddPunish");
-	MarkNativeAsOptional("SP_DB_UnPunish");
+    MarkNativeAsOptional("SP_Reply");
+    MarkNativeAsOptional("SP_FindTarget");
+    MarkNativeAsOptional("SP_RegPunishForward");
+    MarkNativeAsOptional("SP_DeRegPunishForward");
+    MarkNativeAsOptional("SP_RegMenuItem");
+    MarkNativeAsOptional("SP_DeRegMenuItem");
+    MarkNativeAsOptional("SP_TimeToString");
+    MarkNativeAsOptional("SP_StringToTime");
+    MarkNativeAsOptional("SP_IsValidSteamId");
+    MarkNativeAsOptional("SP_IsValidIp");
+    MarkNativeAsOptional("SP_DB_AddPunish");
+    MarkNativeAsOptional("SP_DB_UnPunish");
+    MarkNativeAsOptional("SP_Menu_Reasons");
+    MarkNativeAsOptional("SP_Menu_Players");
+    MarkNativeAsOptional("SP_Menu_Times");
 }
+
+/**
+ * Reply to a command
+ *
+ * @param client   Client to reply to
+ * @param Format   Text to display to client
+ * @param ...      Variable number of format parameters.
+ * @noreturn
+ */
+native SP_Reply(client, const String:Format[], any:...);
 
 /**
  * Find a target
  *
- * @param client	Client who issued command
- * @param target	Client's target argument
- * @param steamid	Optional. Allow search by SteamID
- * @param nobots	Optional. Set to true if bots should NOT be targetted
- * @param immunity	Optional. Set to false to ignore target immunity.
- * @return			Index of target client, or -1 on error.
+ * @param client    Client who issued command
+ * @param target    Client's target argument
+ * @param steamid   Optional. Allow search by SteamID
+ * @param nobots    Optional. Set to true if bots should NOT be targetted
+ * @param immunity  Optional. Set to false to ignore target immunity.
+ * @return          Index of target client, or -1 on error.
  */
 native SP_FindTarget(client, const String:target[], bool:steamid=true, bool:nobots = true, bool:immunity = true);
 
@@ -119,6 +136,22 @@ native SP_TimeToString(time, String:timestring[], maxlen);
 native SP_StringToTime(String:time[], client = -1);
 
 /**
+ * Checks to see if a SteamID should be valid
+ *
+ * @param SteamId  SteamID string
+ * @return         True if matched, false if not
+ */
+native bool:SP_IsValidSteamId(const String:SteamId[]);
+
+/**
+ * Checks to see if an IP address should be valid
+ *
+ * @param IP   IP Address string
+ * @return     True if matched, false if not
+ */
+native bool:SP_IsValidIp(const String:IP[]);
+
+/**
  * Log a punishment in the SQL database
  *
  * @param Punished       Client index of the punished player.
@@ -142,3 +175,30 @@ native SP_DB_AddPunish(Punished, Punisher, PunishTime, PunishAuthType, const Str
  * @noreturn
  */
 native SP_DB_UnPunish(PunishedID, UnPunisherID, PunishAuthType, const String:PunishType[], const String:UnPunishReason[]);
+
+/**
+ * Add a list of players to a menu handle
+ *
+ * @param MenuHandler  A menu handle from CreateMenu()
+ * @param client       The client the list is being built for
+ * @param nobots       Optional. Set to false to include bots in the list
+ * @param immunity     Optional. Set to false to ignore immunity
+ * @return             The passed menu handle with the player list added, or INVALID_HANDLE
+ */
+native Handle:SP_Menu_Players(Handle:MenuHandler, client, bool:nobots=true, bool:immunity = true);
+
+/**
+ * Add a list of times to a menu handle
+ *
+ * @param MenuHandler  A menu handle from CreateMenu()
+ * @return             The passed menu handle with the times list added, or INVALID_HANDLE
+ */
+native Handle:SP_Menu_Times(Handle:MenuHandler);
+
+/**
+ * Add a list of reasons to a menu handle
+ *
+ * @param MenuHandler  A menu handle from CreateMenu()
+ * @return             The passed menu handle with the reasons list added, or INVALID_HANDLE
+ */
+native Handle:SP_Menu_Reasons(Handle:MenuHandler);
