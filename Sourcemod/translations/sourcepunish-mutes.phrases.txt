@@ -1,0 +1,61 @@
+"Phrases"
+{
+	"SP Gag Noname"
+	{
+		"en"			"gagged by admin"
+	}
+	"SP UnGag Noname"
+	{
+		"en"			"ungagged by admin"
+	}
+	"SP Mute Noname"
+	{
+		"en"			"muted by admin"
+	}
+	"SP UnMute Noname"
+	{
+		"en"			"unmuted by admin"
+	}
+	"SP Silence Noname"
+	{
+		"en"			"silenced by admin"
+	}
+	"SP UnSilence Noname"
+	{
+		"en"			"unsilenced by admin"
+	}
+
+	"SP Gag"
+	{
+		"#format"		"{1:s}"
+		"en"			"gagged \"{1}\""
+	}
+	"SP UnGag"
+	{
+		"#format"		"{1:s}"
+		"en"			"ungagged \"{1}\""
+	}
+	"SP Mute"
+	{
+		"#format"		"{1:s}"
+		"en"			"muted \"{1}\""
+	}
+
+	"SP UnMute"
+	{
+		"#format"		"{1:s}"
+		"en"			"unmuted \"{1}\""
+	}
+
+	"SP Silence"
+	{
+		"#format"		"{1:s}"
+		"en"			"silence \"{1}\""
+	}
+
+	"SP UnSilence"
+	{
+		"#format"		"{1:s}"
+		"en"			"unsilenced \"{1}\""
+	}
+}
